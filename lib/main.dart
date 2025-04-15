@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'views/login_view.dart';
-import 'views/home_view.dart';
-import 'services/auth_service.dart';
+import 'package:provider/provider.dart';
+import 'screens/login_screen.dart';
+import 'providers/auth_provider.dart';
+import 'providers/villa_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,27 +16,49 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'يلا مزرعة',
-      theme: ThemeData(
-        scaffoldBackgroundColor: Colors.white,
-        primaryColor: const Color(0xFF00C853),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.white,
-          elevation: 0,
-          iconTheme: IconThemeData(color: Colors.black),
-          titleTextStyle: TextStyle(
-            color: Colors.black,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<AuthProvider>(
+          create: (_) => AuthProvider(),
+        ),
+        ChangeNotifierProvider<VillaProvider>(
+          create: (_) => VillaProvider(),
+        ),
+      ],
+      child: MaterialApp(
+        title: 'يلا مزرعة',
+        theme: ThemeData(
+          scaffoldBackgroundColor: Colors.white,
+          primaryColor: const Color(0xFF00C853),
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            iconTheme: IconThemeData(color: Colors.black),
+            titleTextStyle: TextStyle(
+              color: Colors.black,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
-        textTheme: const TextTheme(
-          bodyLarge: TextStyle(color: Colors.black),
-          bodyMedium: TextStyle(color: Colors.black),
+        home: Consumer<AuthProvider>(
+          builder: (context, authProvider, child) {
+            // Show login screen initially
+            if (authProvider.status == AuthStatus.initial) {
+              return const Scaffold(
+                body: Center(
+                  child: CircularProgressIndicator(),
+                ),
+              );
+            } else if (authProvider.isAuthenticated) {
+              return const MainAppScreen(); // This is defined in login_screen.dart
+            } else {
+              return const LoginScreen();
+            }
+          },
         ),
+        debugShowCheckedModeBanner: false,
       ),
-      home: AuthService().currentUser != null ? const HomeView() : const LoginView(),
     );
   }
 }

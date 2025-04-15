@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import '../models/user.dart';
+import '../services/auth_service.dart';
 
 enum AuthStatus { initial, authenticated, unauthenticated }
 
 class AuthProvider extends ChangeNotifier {
+  final AuthService _authService = AuthService();
+
   AuthStatus _status = AuthStatus.initial;
   User? _currentUser;
   String _errorMessage = '';
@@ -13,35 +16,59 @@ class AuthProvider extends ChangeNotifier {
   String get errorMessage => _errorMessage;
   bool get isAuthenticated => _status == AuthStatus.authenticated;
 
-  // Mock implementation of Google sign in
+  AuthProvider() {
+    _initializeAuth();
+  }
+
+  Future<void> _initializeAuth() async {
+    if (_authService.currentUser != null) {
+      try {
+        final userData = await _authService.getUserData();
+        if (userData != null) {
+          _currentUser = userData;
+          _status = AuthStatus.authenticated;
+        } else {
+          _status = AuthStatus.unauthenticated;
+        }
+      } catch (e) {
+        _status = AuthStatus.unauthenticated;
+      }
+    } else {
+      _status = AuthStatus.unauthenticated;
+    }
+    notifyListeners();
+  }
+
+  // Google sign in
   Future<bool> signInWithGoogle() async {
     try {
-      // Simulate network delay
-      await Future.delayed(const Duration(seconds: 1));
-      
-      // Mock successful authentication
-      _currentUser = User(
-        id: '1',
-        name: 'محمد أحمد',
-        email: 'mohammed@example.com',
-        phoneNumber: '0501234567',
-        photoUrl: 'https://ui-avatars.com/api/?name=محمد+أحمد&background=0D8ABC&color=fff',
-        isGoogleSignIn: true,
-      );
-      
-      _status = AuthStatus.authenticated;
+      _status = AuthStatus.initial;
       _errorMessage = '';
       notifyListeners();
-      return true;
+
+      final user = await _authService.signInWithGoogle();
+
+      if (user != null) {
+        _currentUser = user;
+        _status = AuthStatus.authenticated;
+        _errorMessage = '';
+        notifyListeners();
+        return true;
+      } else {
+        _errorMessage = 'فشل تسجيل الدخول باستخدام جوجل';
+        _status = AuthStatus.unauthenticated;
+        notifyListeners();
+        return false;
+      }
     } catch (e) {
-      _errorMessage = 'فشل تسجيل الدخول باستخدام جوجل';
+      _errorMessage = 'فشل تسجيل الدخول باستخدام جوجل: ${e.toString()}';
       _status = AuthStatus.unauthenticated;
       notifyListeners();
       return false;
     }
   }
 
-  // Mock implementation of phone/password sign in
+  // Phone/password sign in
   Future<bool> signInWithPhonePassword(String phone, String password) async {
     try {
       // Validate input
@@ -50,20 +77,15 @@ class AuthProvider extends ChangeNotifier {
         notifyListeners();
         return false;
       }
-      
-      // Simulate network delay
-      await Future.delayed(const Duration(seconds: 1));
-      
-      // Check mock credentials (in a real app, this would be a server call)
-      if (phone == '0501234567' && password == '123456') {
-        _currentUser = User(
-          id: '2',
-          name: 'عبدالله محمد',
-          email: 'abdullah@example.com',
-          phoneNumber: phone,
-          isGoogleSignIn: false,
-        );
-        
+
+      _status = AuthStatus.initial;
+      _errorMessage = '';
+      notifyListeners();
+
+      final user = await _authService.signInWithPhonePassword(phone, password);
+
+      if (user != null) {
+        _currentUser = user;
         _status = AuthStatus.authenticated;
         _errorMessage = '';
         notifyListeners();
@@ -75,39 +97,47 @@ class AuthProvider extends ChangeNotifier {
         return false;
       }
     } catch (e) {
-      _errorMessage = 'حدث خطأ أثناء تسجيل الدخول';
+      _errorMessage = 'حدث خطأ أثناء تسجيل الدخول: ${e.toString()}';
       _status = AuthStatus.unauthenticated;
       notifyListeners();
       return false;
     }
   }
 
-  // Sign out function
+  // Sign out
   Future<void> signOut() async {
-    // Simulate network delay
-    await Future.delayed(const Duration(milliseconds: 500));
-    
-    _currentUser = null;
-    _status = AuthStatus.unauthenticated;
-    notifyListeners();
+    try {
+      await _authService.signOut();
+      _currentUser = null;
+      _status = AuthStatus.unauthenticated;
+      notifyListeners();
+    } catch (e) {
+      print('Logout error: $e');
+    }
   }
 
-  // Add villa to favorites
-  void toggleFavorite(String villaId) {
+  // Toggle favorite villa
+  Future<void> toggleFavorite(String villaId) async {
     if (_currentUser == null) return;
 
     List<String> updatedFavorites = List.from(_currentUser!.favoriteVillas);
-    
+
     if (updatedFavorites.contains(villaId)) {
       updatedFavorites.remove(villaId);
     } else {
       updatedFavorites.add(villaId);
     }
-    
-    _currentUser = _currentUser!.copyWith(favoriteVillas: updatedFavorites);
+
+    final updatedUser = _currentUser!.copyWith(favoriteVillas: updatedFavorites);
+    _currentUser = updatedUser;
+
+    // Update Firestore
+    await _authService.updateUserData(updatedUser);
+
     notifyListeners();
   }
 
+  // Check if villa is favorite
   bool isFavorite(String villaId) {
     return _currentUser?.favoriteVillas.contains(villaId) ?? false;
   }

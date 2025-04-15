@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "286265360994",
+    "project_id": "yalla-mazra3a",
+    "storage_bucket": "yalla-mazra3a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:286265360994:android:b3c72cb4b3c545d047c73b",
+        "android_client_info": {
+          "package_name": "com.example.yalla_mazra3a"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "286265360994-p0mc11q2rk3127tkv2e4jghkncu81s7n.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.yalla_mazra3a",
+            "certificate_hash": "5b88c9e5b7e7c6f3783d19c57c4c5de7ebc28a3b"
+          }
+        },
+        {
+          "client_id": "286265360994-b03goljci8n0ucnjn3uupmgso17kev98.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAvBD-6d1CAWXqGE_xe_D5jHo_7JvBKrvk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "286265360994-b03goljci8n0ucnjn3uupmgso17kev98.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
