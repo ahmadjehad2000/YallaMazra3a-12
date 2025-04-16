@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
 
-enum AuthStatus { initial, authenticated, unauthenticated, otpSent, otpVerified }
+enum AuthStatus { initial, authenticated, unauthenticated }
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
@@ -10,13 +10,11 @@ class AuthProvider extends ChangeNotifier {
   AuthStatus _status = AuthStatus.initial;
   User? _currentUser;
   String _errorMessage = '';
-  String _verificationId = '';
 
   AuthStatus get status => _status;
   User? get currentUser => _currentUser;
   String get errorMessage => _errorMessage;
   bool get isAuthenticated => _status == AuthStatus.authenticated;
-  String get verificationId => _verificationId;
 
   AuthProvider() {
     _initializeAuth();
@@ -39,6 +37,45 @@ class AuthProvider extends ChangeNotifier {
       _status = AuthStatus.unauthenticated;
     }
     notifyListeners();
+  }
+
+  // Register with phone/password
+  Future<bool> registerWithPhonePassword({
+    required String name,
+    required String email,
+    required String phone,
+    required String password,
+  }) async {
+    try {
+      _status = AuthStatus.initial;
+      _errorMessage = '';
+      notifyListeners();
+
+      final user = await _authService.registerWithPhonePassword(
+        name: name,
+        email: email,
+        phone: phone,
+        password: password,
+      );
+
+      if (user != null) {
+        _currentUser = user;
+        _status = AuthStatus.authenticated;
+        _errorMessage = '';
+        notifyListeners();
+        return true;
+      } else {
+        _errorMessage = 'فشل التسجيل، يرجى المحاولة مرة أخرى';
+        _status = AuthStatus.unauthenticated;
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _errorMessage = 'حدث خطأ أثناء التسجيل: ${e.toString()}';
+      _status = AuthStatus.unauthenticated;
+      notifyListeners();
+      rethrow; // Re-throw for more specific handling in UI
+    }
   }
 
   // Manual override login method
@@ -145,75 +182,5 @@ class AuthProvider extends ChangeNotifier {
   // Check if villa is favorite
   bool isFavorite(String villaId) {
     return _currentUser?.favoriteVillas.contains(villaId) ?? false;
-  }
-
-  // Phone verification methods
-
-  // Request OTP
-  Future<bool> requestOTP(String phoneNumber) async {
-    try {
-      _status = AuthStatus.initial;
-      _errorMessage = '';
-      notifyListeners();
-
-      // TODO: Implement phone verification via Firebase
-      // For now, just simulate OTP sent
-      _verificationId = DateTime.now().millisecondsSinceEpoch.toString();
-      _status = AuthStatus.otpSent;
-      notifyListeners();
-
-      return true;
-    } catch (e) {
-      _errorMessage = 'حدث خطأ: ${e.toString()}';
-      _status = AuthStatus.unauthenticated;
-      notifyListeners();
-      return false;
-    }
-  }
-
-  // Verify OTP and register
-  Future<bool> verifyOTPAndRegister({
-    required String otp,
-    required String name,
-    required String email,
-    required String phoneNumber,
-    required String password,
-  }) async {
-    try {
-      _status = AuthStatus.initial;
-      _errorMessage = '';
-      notifyListeners();
-
-      // TODO: Implement OTP verification via Firebase
-      // For now, simulate successful verification
-      if (otp == "123456" || true) { // For testing, any OTP works
-        // Create user
-        final userData = User(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          name: name,
-          email: email,
-          phoneNumber: phoneNumber,
-          photoUrl: null,
-          isGoogleSignIn: false,
-          favoriteVillas: [],
-          bookings: [],
-        );
-
-        _currentUser = userData;
-        _status = AuthStatus.authenticated;
-        notifyListeners();
-        return true;
-      } else {
-        _errorMessage = 'رمز التحقق غير صحيح';
-        _status = AuthStatus.otpSent;
-        notifyListeners();
-        return false;
-      }
-    } catch (e) {
-      _errorMessage = 'حدث خطأ: ${e.toString()}';
-      _status = AuthStatus.otpSent;
-      notifyListeners();
-      return false;
-    }
   }
 }

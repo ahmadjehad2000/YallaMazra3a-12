@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/svg.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import 'main_app_screen.dart';
@@ -74,7 +73,7 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              SvgPicture.asset('assets/logo.svg', height: 100),
+              Image.asset('assets/logo.png', height: 100),
               const SizedBox(height: 24),
               const Text(
                 'تسجيل الدخول',
@@ -91,6 +90,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       decoration: const InputDecoration(
                         labelText: 'رقم الهاتف',
                         border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.phone),
                       ),
                       validator: (value) =>
                       value!.isEmpty ? 'الرجاء إدخال رقم الهاتف' : null,
@@ -102,6 +102,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       decoration: InputDecoration(
                         labelText: 'كلمة المرور',
                         border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.lock),
                         suffixIcon: IconButton(
                           icon: Icon(_isPasswordVisible
                               ? Icons.visibility_off
@@ -119,17 +120,27 @@ class _LoginScreenState extends State<LoginScreen> {
                       height: 48,
                       child: ElevatedButton(
                         onPressed: _isLoading ? null : _login,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(context).primaryColor,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
                         child: _isLoading
                             ? const CircularProgressIndicator(color: Colors.white)
-                            : const Text('تسجيل الدخول'),
+                            : const Text(
+                          'تسجيل الدخول',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),
                     Row(
                       children: [
-                        const Expanded(
-                          child: Divider(thickness: 1),
-                        ),
+                        const Expanded(child: Divider()),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: Text(
@@ -140,9 +151,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         ),
-                        const Expanded(
-                          child: Divider(thickness: 1),
-                        ),
+                        const Expanded(child: Divider()),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -154,7 +163,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         style: OutlinedButton.styleFrom(
                           side: BorderSide(color: Colors.grey[400]!),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(8),
                           ),
                         ),
                         icon: _isGoogleLoading
@@ -168,8 +177,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         )
-                            : SvgPicture.asset(
-                          'assets/google_logo.svg',
+                            : Image.asset(
+                          'assets/google_logo.png',
                           height: 24,
                           width: 24,
                         ),
@@ -182,6 +191,14 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     ),
+                    if (authProvider.errorMessage.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 16.0),
+                        child: Text(
+                          authProvider.errorMessage,
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                      ),
                     const SizedBox(height: 24),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -203,14 +220,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ],
                     ),
-                    if (authProvider.errorMessage.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 16.0),
-                        child: Text(
-                          authProvider.errorMessage,
-                          style: const TextStyle(color: Colors.red),
-                        ),
-                      ),
                   ],
                 ),
               ),

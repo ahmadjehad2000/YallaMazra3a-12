@@ -1,9 +1,13 @@
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:crypto/crypto.dart';
+import 'dart:convert';
 import '../models/user.dart' as app_user;
 
 class AuthService {
   final firebase_auth.FirebaseAuth _auth = firebase_auth.FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   // Get current Firebase user
@@ -14,7 +18,6 @@ class AuthService {
     try {
       // Trigger the Google authentication flow
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-
       if (googleUser == null) return null;
 
       // Obtain auth details from the request
@@ -31,19 +34,29 @@ class AuthService {
       final user = userCredential.user;
 
       if (user != null) {
-        // Create a user object from Firebase user
-        return app_user.User(
-          id: user.uid,
-          name: user.displayName ?? 'User',
-          email: user.email ?? '',
-          phoneNumber: user.phoneNumber,
-          photoUrl: user.photoURL,
-          isGoogleSignIn: true,
-          favoriteVillas: [],
-          bookings: [],
-        );
-      }
+        // Check if user exists in Firestore
+        final docSnapshot = await _firestore.collection('users').doc(user.uid).get();
 
+        if (!docSnapshot.exists) {
+          // Create a new user if doesn't exist
+          final newUser = app_user.User(
+            id: user.uid,
+            name: user.displayName ?? 'User',
+            email: user.email ?? '',
+            phoneNumber: user.phoneNumber,
+            photoUrl: user.photoURL,
+            isGoogleSignIn: true,
+            favoriteVillas: [],
+            bookings: [],
+          );
+
+          await _firestore.collection('users').doc(user.uid).set(newUser.toJson());
+          return newUser;
+        } else {
+          // Return existing user
+          return app_user.User.fromJson(docSnapshot.data()!);
+        }
+      }
       return null;
     } catch (e) {
       print('Google Sign-In error: $e');
@@ -51,49 +64,157 @@ class AuthService {
     }
   }
 
-  // Sign in with email & password
-  Future<app_user.User?> signInWithEmailPassword(String email, String password) async {
+  // Register with phone and password
+  Future<app_user.User?> registerWithPhonePassword({
+    required String name,
+    required String email,
+    required String phone,
+    required String password,
+  }) async {
     try {
-      final userCredential = await _auth.signInWithEmailAndPassword(
-        email: email,
+      // Create email from phone for Firebase Auth
+      final emailFromPhone = _createEmailFromPhone(phone);
+
+      // Register with Firebase
+      final userCredential = await _auth.createUserWithEmailAndPassword(
+        email: emailFromPhone,
         password: password,
       );
 
       final user = userCredential.user;
       if (user != null) {
-        return app_user.User(
+        // Update display name
+        await user.updateDisplayName(name);
+
+        // Create user in Firestore
+        final newUser = app_user.User(
           id: user.uid,
-          name: user.displayName ?? 'User',
-          email: user.email ?? '',
-          phoneNumber: user.phoneNumber,
-          photoUrl: user.photoURL,
+          name: name,
+          email: email,
+          phoneNumber: phone,
+          photoUrl: null,
           isGoogleSignIn: false,
           favoriteVillas: [],
           bookings: [],
         );
+
+        // Store user profile in Firestore
+        await _firestore.collection('users').doc(user.uid).set(newUser.toJson());
+
+        // Store auth information including hashed password
+        await _firestore.collection('user_auth').doc(user.uid).set({
+          'phone': phone,
+          'email': emailFromPhone,
+          'password': _hashPassword(password), // Store hashed password
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+
+        return newUser;
+      }
+      return null;
+    } catch (e) {
+      print('Registration error: $e');
+      throw e;
+    }
+  }
+
+  // Sign in with phone and password
+  Future<app_user.User?> signInWithPhonePassword(String phone, String password) async {
+    try {
+      // Create email from phone
+      final emailFromPhone = _createEmailFromPhone(phone);
+
+      try {
+        // First, try signing in with Firebase Auth
+        final userCredential = await _auth.signInWithEmailAndPassword(
+            email: emailFromPhone,
+            password: password
+        );
+
+        final user = userCredential.user;
+        if (user != null) {
+          // Get user data from Firestore
+          final docSnapshot = await _firestore.collection('users').doc(user.uid).get();
+
+          if (docSnapshot.exists) {
+            // Update password hash in Firestore if it doesn't exist
+            await _updatePasswordHash(user.uid, password);
+            return app_user.User.fromJson(docSnapshot.data()!);
+          } else {
+            // Create basic user if not exists (fallback)
+            final newUser = app_user.User(
+              id: user.uid,
+              name: user.displayName ?? 'User',
+              email: user.email ?? '',
+              phoneNumber: phone,
+              photoUrl: null,
+              isGoogleSignIn: false,
+              favoriteVillas: [],
+              bookings: [],
+            );
+
+            await _firestore.collection('users').doc(user.uid).set(newUser.toJson());
+            await _updatePasswordHash(user.uid, password);
+            return newUser;
+          }
+        }
+      } catch (authError) {
+        print('Firebase Auth error: $authError');
+
+        // Try finding user by phone number in Firestore as fallback
+        final querySnapshot = await _firestore
+            .collection('user_auth')
+            .where('phone', isEqualTo: phone)
+            .limit(1)
+            .get();
+
+        if (querySnapshot.docs.isNotEmpty) {
+          final authDoc = querySnapshot.docs.first;
+          final storedPassword = authDoc['password'];
+
+          // Verify password
+          if (storedPassword == _hashPassword(password)) {
+            final userId = authDoc.id;
+            final userDoc = await _firestore.collection('users').doc(userId).get();
+
+            if (userDoc.exists) {
+              // Try to sign in with Firebase Auth for session
+              try {
+                await _auth.signInWithEmailAndPassword(
+                    email: emailFromPhone,
+                    password: password
+                );
+              } catch (e) {
+                print('Could not sign in with Firebase Auth: $e');
+                // Continue anyway, as we verified password manually
+              }
+
+              return app_user.User.fromJson(userDoc.data()!);
+            }
+          }
+        }
       }
 
       return null;
     } catch (e) {
-      print('Email/Password Sign-In error: $e');
+      print('Phone/Password Sign-In error: $e');
       return null;
     }
   }
 
-  // Sign in with phone number and password
-  Future<app_user.User?> signInWithPhonePassword(String phone, String password) async {
+  // Update password hash in Firestore
+  Future<void> _updatePasswordHash(String userId, String password) async {
     try {
-      // In a real app, you would validate against your user database
-      // For now, we'll use a workaround with email sign-in
+      final authDoc = await _firestore.collection('user_auth').doc(userId).get();
 
-      // Convert phone to email for testing purposes
-      // This is just a mock implementation
-      final email = '$phone@example.com';
-
-      return await signInWithEmailPassword(email, password);
+      if (!authDoc.exists || authDoc.data()!['password'] == null) {
+        await _firestore.collection('user_auth').doc(userId).set({
+          'password': _hashPassword(password),
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
     } catch (e) {
-      print('Phone/Password Sign-In error: $e');
-      return null;
+      print('Error updating password hash: $e');
     }
   }
 
@@ -112,20 +233,11 @@ class AuthService {
     final user = _auth.currentUser;
 
     if (user != null) {
-      // Determine if user signed in with Google
-      bool isGoogleSignIn = user.providerData
-          .any((provider) => provider.providerId == 'google.com');
+      final docSnapshot = await _firestore.collection('users').doc(user.uid).get();
 
-      return app_user.User(
-        id: user.uid,
-        name: user.displayName ?? 'User',
-        email: user.email ?? '',
-        phoneNumber: user.phoneNumber,
-        photoUrl: user.photoURL,
-        isGoogleSignIn: isGoogleSignIn,
-        favoriteVillas: [],
-        bookings: [],
-      );
+      if (docSnapshot.exists) {
+        return app_user.User.fromJson(docSnapshot.data()!);
+      }
     }
 
     return null;
@@ -134,19 +246,11 @@ class AuthService {
   // Update user data
   Future<bool> updateUserData(app_user.User userData) async {
     try {
-      // In a real app with Firestore, you would update the user document
-      // For now, we'll implement a basic update of the profile
       final user = _auth.currentUser;
 
       if (user != null) {
-        // Update displayName if different
-        if (user.displayName != userData.name) {
-          await user.updateDisplayName(userData.name);
-        }
-
-        // Note: Updating email, phone, etc. requires additional verification
-        // which we're not implementing here for simplicity
-
+        // Update Firestore
+        await _firestore.collection('users').doc(user.uid).update(userData.toJson());
         return true;
       }
 
@@ -155,5 +259,19 @@ class AuthService {
       print('Update User Data error: $e');
       return false;
     }
+  }
+
+  // Helper method to create email from phone
+  String _createEmailFromPhone(String phone) {
+    // Remove any non-numeric characters
+    final cleanPhone = phone.replaceAll(RegExp(r'[^\d]'), '');
+    return '$cleanPhone@yallamazra3a.app';
+  }
+
+  // Helper method to hash password
+  String _hashPassword(String password) {
+    final bytes = utf8.encode(password);
+    final digest = sha256.convert(bytes);
+    return digest.toString();
   }
 }

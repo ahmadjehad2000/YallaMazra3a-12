@@ -34,5 +34,5 @@ flutter:
   uses-material-design: true
   
   assets:
-        - assets/logo.svg
-        - assets/google_logo.svg
+        - assets/logo.png
+        - assets/google_logo.png
