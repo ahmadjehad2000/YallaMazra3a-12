@@ -1,0 +1,67 @@
+[
+  {
+    "id": "villa1",
+    "name": "مزرعة الأحلام",
+    "location": "عمان",
+    "image_url": "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80",
+    "description": "مزرعة هادئة بإطلالة جميلة وخدمات متكاملة. مناسبة للعائلات والأصدقاء للاستمتاع بأجواء الطبيعة والاسترخاء.",
+    "price": 120,
+    "rating": 4.8,
+    "capacity": 10,
+    "hasPool": true,
+    "hasWifi": true,
+    "hasBarbecue": true
+  },
+  {
+    "id": "villa2",
+    "name": "استراحة النخيل",
+    "location": "الزرقاء",
+    "image_url": "https://images.unsplash.com/photo-1587300003388-59208cc962cb?auto=format&fit=crop&w=800&q=80",
+    "description": "استراحة مميزة للعائلات وسط النخيل. موقع هادئ بعيد عن ضوضاء المدينة ومناسب للاستجمام.",
+    "price": 85,
+    "rating": 4.5,
+    "capacity": 8,
+    "hasPool": false,
+    "hasWifi": true,
+    "hasBarbecue": true
+  },
+  {
+    "id": "villa3",
+    "name": "شاليه الواحة",
+    "location": "عمان",
+    "image_url": "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=800&q=80",
+    "description": "شاليه فاخر مع حديقة واسعة ومسبح خاص. مجهز بأحدث وسائل الراحة والترفيه.",
+    "price": 150,
+    "rating": 4.9,
+    "capacity": 12,
+    "hasPool": true,
+    "hasWifi": true,
+    "hasBarbecue": true
+  },
+  {
+    "id": "villa4",
+    "name": "بيت الريف",
+    "location": "إربد",
+    "image_url": "https://images.unsplash.com/photo-1568605114967-8130f3a36994?auto=format&fit=crop&w=800&q=80",
+    "description": "بيت ريفي تقليدي محاط بالأشجار والمزارع. المكان المثالي للهروب من الحياة المدنية.",
+    "price": 75,
+    "rating": 4.4,
+    "capacity": 6,
+    "hasPool": false,
+    "hasWifi": true,
+    "hasBarbecue": true
+  },
+  {
+    "id": "villa5",
+    "name": "فيلا الصفاء",
+    "location": "العقبة",
+    "image_url": "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80",
+    "description": "فيلا حديثة مطلة على البحر مع شاطئ خاص. تصميم عصري وإطلالات خلابة.",
+    "price": 200,
+    "rating": 4.7,
+    "capacity": 8,
+    "hasPool": true,
+    "hasWifi": true,
+    "hasBarbecue": false
+  }
+]

@@ -1,38 +1,171 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/villa.dart';
-import '../services/villa_service.dart';
+import '../providers/villa_provider.dart';
+import '../widgets/search_bar.dart';
+import '../widgets/filter_chip.dart';
 import 'villa_details_screen.dart';
 
-class VillaListingsScreen extends StatelessWidget {
+class VillaListingsScreen extends StatefulWidget {
   const VillaListingsScreen({super.key});
 
   @override
+  State<VillaListingsScreen> createState() => _VillaListingsScreenState();
+}
+
+class _VillaListingsScreenState extends State<VillaListingsScreen> {
+  bool _showFilters = false;
+
+  @override
   Widget build(BuildContext context) {
+    final villaProvider = Provider.of<VillaProvider>(context);
+
     return Scaffold(
-      appBar: AppBar(title: const Text("قائمة المزارع")),
-      body: StreamBuilder<List<Villa>>(
-        stream: VillaService().streamVillas(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: Column(
+        children: [
+          // Search & filter bar
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: CustomSearchBar(
+                    onSearch: (query) {
+                      villaProvider.setSearchQuery(query);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      _showFilters = !_showFilters;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: _showFilters
+                          ? Theme.of(context).primaryColor
+                          : Colors.grey[200],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.filter_list,
+                      color: _showFilters ? Colors.white : Colors.black,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
 
-          if (snapshot.hasError) {
-            return const Center(child: Text('حدث خطأ أثناء تحميل البيانات'));
-          }
+          // Filter chips
+          if (_showFilters)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              margin: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        "الفلترة حسب",
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      TextButton(
+                        onPressed: () => villaProvider.resetFilters(),
+                        child: const Text("إعادة ضبط"),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      FilterChipWidget(
+                        label: 'مسبح',
+                        isSelected: villaProvider.filters['مسبح'] ?? false,
+                        onSelected: (_) => villaProvider.toggleFilter('مسبح'),
+                      ),
+                      FilterChipWidget(
+                        label: 'واي فاي',
+                        isSelected: villaProvider.filters['واي فاي'] ?? false,
+                        onSelected: (_) => villaProvider.toggleFilter('واي فاي'),
+                      ),
+                      FilterChipWidget(
+                        label: 'شواء',
+                        isSelected: villaProvider.filters['شواء'] ?? false,
+                        onSelected: (_) => villaProvider.toggleFilter('شواء'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
 
-          final villas = snapshot.data ?? [];
+          // Horizontal categories
+          Expanded(
+            child: villaProvider.villas.isEmpty
+                ? const Center(child: CircularProgressIndicator())
+                : ListView(
+              padding: const EdgeInsets.only(top: 8),
+              children: [
+                _buildCategorySection(context, "الأعلى تقييماً", villaProvider.getTopRatedVillas()),
+                _buildCategorySection(context, "الأكثر طلباً", villaProvider.getMostPopularVillas()),
+                _buildCategorySection(context, "قريب منك", villaProvider.getNearbyVillas("عمان")),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-          if (villas.isEmpty) {
-            return const Center(child: Text('لا توجد مزارع متاحة حالياً.'));
-          }
+  Widget _buildCategorySection(
+      BuildContext context, String title, List<Villa> villas) {
+    if (villas.isEmpty) {
+      return const SizedBox.shrink(); // Don't show empty sections
+    }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(title,
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              TextButton(
+                onPressed: () {
+                  Provider.of<VillaProvider>(context, listen: false)
+                      .setSelectedCategory(title);
+                },
+                child: const Text("عرض الكل"),
+              ),
+            ],
+          ),
+        ),
+
+        // Horizontal list
+        SizedBox(
+          height: 280,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
             itemCount: villas.length,
             itemBuilder: (context, index) {
               final villa = villas[index];
-
               return GestureDetector(
                 onTap: () {
                   Navigator.push(
@@ -43,74 +176,60 @@ class VillaListingsScreen extends StatelessWidget {
                   );
                 },
                 child: Container(
-                  margin: const EdgeInsets.only(bottom: 16),
+                  width: 260,
+                  margin: const EdgeInsets.only(right: 12),
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
                     color: Colors.white,
-                    boxShadow: [
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: const [
                       BoxShadow(
                         color: Colors.black12,
-                        blurRadius: 10,
-                        offset: Offset(0, 6),
+                        blurRadius: 6,
+                        offset: Offset(0, 4),
                       ),
                     ],
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      // Image
                       ClipRRect(
                         borderRadius:
-                        const BorderRadius.vertical(top: Radius.circular(20)),
+                        const BorderRadius.vertical(top: Radius.circular(16)),
                         child: Image.network(
                           villa.imageUrl,
-                          height: 200,
+                          height: 150,
                           width: double.infinity,
                           fit: BoxFit.cover,
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return const SizedBox(
-                              height: 200,
-                              child: Center(child: CircularProgressIndicator()),
-                            );
-                          },
-                          errorBuilder: (context, error, stackTrace) => Container(
-                            height: 200,
-                            color: Colors.grey[200],
-                            alignment: Alignment.center,
-                            child: const Icon(Icons.broken_image, size: 50, color: Colors.grey),
+                          errorBuilder: (_, __, ___) => Container(
+                            height: 150,
+                            color: Colors.grey[300],
+                            child: const Icon(Icons.broken_image),
                           ),
                         ),
                       ),
+
+                      // Info
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        padding: const EdgeInsets.all(12.0),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               villa.name,
-                              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 16),
                             ),
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                const Icon(Icons.location_on, size: 18, color: Colors.grey),
-                                const SizedBox(width: 4),
-                                Text(
-                                  villa.location,
-                                  style: const TextStyle(fontSize: 14, color: Colors.grey),
-                                ),
-                              ],
+                            const SizedBox(height: 4),
+                            Text(
+                              villa.location,
+                              style: const TextStyle(color: Colors.grey),
                             ),
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                const Icon(Icons.attach_money, size: 18, color: Colors.green),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '${villa.price.toStringAsFixed(0)} دينار أردني / اليوم',
-                                  style: const TextStyle(fontSize: 16, color: Colors.green),
-                                ),
-                              ],
+                            const SizedBox(height: 8),
+                            Text(
+                              '${villa.price.toStringAsFixed(0)} دينار أردني / اليوم',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold, color: Colors.green),
                             ),
                           ],
                         ),
@@ -120,9 +239,9 @@ class VillaListingsScreen extends StatelessWidget {
                 ),
               );
             },
-          );
-        },
-      ),
+          ),
+        ),
+      ],
     );
   }
 }
