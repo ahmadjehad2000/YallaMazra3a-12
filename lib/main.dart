@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
-import 'screens/login_screen.dart';
 import 'providers/auth_provider.dart';
 import 'providers/villa_provider.dart';
+import 'screens/login_screen.dart';
+import 'screens/main_app_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,23 +42,20 @@ class MyApp extends StatelessWidget {
             ),
           ),
         ),
+        debugShowCheckedModeBanner: false,
         home: Consumer<AuthProvider>(
           builder: (context, authProvider, child) {
-            // Show login screen initially
             if (authProvider.status == AuthStatus.initial) {
               return const Scaffold(
-                body: Center(
-                  child: CircularProgressIndicator(),
-                ),
+                body: Center(child: CircularProgressIndicator()),
               );
             } else if (authProvider.isAuthenticated) {
-              return const MainAppScreen(); // This is defined in login_screen.dart
+              return const MainAppScreen();
             } else {
               return const LoginScreen();
             }
           },
         ),
-        debugShowCheckedModeBanner: false,
       ),
     );
   }

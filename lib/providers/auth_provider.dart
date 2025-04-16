@@ -39,7 +39,13 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Google sign in
+  /// ✅ Added manual override login method
+  void setAuthenticated(bool value) {
+    _status = value ? AuthStatus.authenticated : AuthStatus.unauthenticated;
+    notifyListeners();
+  }
+
+  /// Google sign in
   Future<bool> signInWithGoogle() async {
     try {
       _status = AuthStatus.initial;
@@ -68,10 +74,9 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // Phone/password sign in
+  /// Phone/password sign in
   Future<bool> signInWithPhonePassword(String phone, String password) async {
     try {
-      // Validate input
       if (phone.isEmpty || password.isEmpty) {
         _errorMessage = 'الرجاء إدخال رقم الهاتف وكلمة المرور';
         notifyListeners();
@@ -104,7 +109,7 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // Sign out
+  /// Sign out
   Future<void> signOut() async {
     try {
       await _authService.signOut();
@@ -116,7 +121,7 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // Toggle favorite villa
+  /// Toggle favorite villa
   Future<void> toggleFavorite(String villaId) async {
     if (_currentUser == null) return;
 
@@ -131,13 +136,11 @@ class AuthProvider extends ChangeNotifier {
     final updatedUser = _currentUser!.copyWith(favoriteVillas: updatedFavorites);
     _currentUser = updatedUser;
 
-    // Update Firestore
     await _authService.updateUserData(updatedUser);
-
     notifyListeners();
   }
 
-  // Check if villa is favorite
+  /// Check if villa is favorite
   bool isFavorite(String villaId) {
     return _currentUser?.favoriteVillas.contains(villaId) ?? false;
   }
