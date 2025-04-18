@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:yalla_mazra3a/screens/profile_screen.dart';
 import 'package:yalla_mazra3a/screens/villa_listings_screen.dart';
+import 'package:yalla_mazra3a/screens/my_bookings_screen.dart'; // ✅ add this import
 
 class MainAppScreen extends StatefulWidget {
   const MainAppScreen({super.key});
@@ -14,6 +15,7 @@ class _MainAppScreenState extends State<MainAppScreen> {
 
   final List<Widget> _screens = const [
     VillaListingsScreen(),
+    MyBookingsScreen(),
     ProfileScreen(),
   ];
 
@@ -28,6 +30,10 @@ class _MainAppScreenState extends State<MainAppScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.home),
             label: 'الرئيسية',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.calendar_today),
+            label: 'حجوزاتي',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person),

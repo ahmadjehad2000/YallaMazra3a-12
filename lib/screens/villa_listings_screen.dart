@@ -1,247 +1,128 @@
+// villa_listings_screen.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../models/villa.dart';
-import '../providers/villa_provider.dart';
-import '../widgets/search_bar.dart';
-import '../widgets/filter_chip.dart';
-import 'villa_details_screen.dart';
+import 'villa_detail_screen.dart';
 
-class VillaListingsScreen extends StatefulWidget {
-  const VillaListingsScreen({super.key});
+class VillaListingsScreen extends StatelessWidget {
+  const VillaListingsScreen({Key? key}) : super(key: key);
 
-  @override
-  State<VillaListingsScreen> createState() => _VillaListingsScreenState();
-}
-
-class _VillaListingsScreenState extends State<VillaListingsScreen> {
-  bool _showFilters = false;
+  Stream<List<Villa>> getVillaStream() {
+    return FirebaseFirestore.instance.collection('villas').snapshots().map((snapshot) {
+      return snapshot.docs.map((doc) => Villa.fromMap(doc.data())).toList();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final villaProvider = Provider.of<VillaProvider>(context);
-
     return Scaffold(
-      body: Column(
-        children: [
-          // Search & filter bar
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: CustomSearchBar(
-                    onSearch: (query) {
-                      villaProvider.setSearchQuery(query);
-                    },
-                  ),
-                ),
-                const SizedBox(width: 8),
-                InkWell(
-                  onTap: () {
-                    setState(() {
-                      _showFilters = !_showFilters;
-                    });
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: _showFilters
-                          ? Theme.of(context).primaryColor
-                          : Colors.grey[200],
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      Icons.filter_list,
-                      color: _showFilters ? Colors.white : Colors.black,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Filter chips
-          if (_showFilters)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(12),
-              ),
-              margin: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        "الفلترة حسب",
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                      TextButton(
-                        onPressed: () => villaProvider.resetFilters(),
-                        child: const Text("إعادة ضبط"),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      FilterChipWidget(
-                        label: 'مسبح',
-                        isSelected: villaProvider.filters['مسبح'] ?? false,
-                        onSelected: (_) => villaProvider.toggleFilter('مسبح'),
-                      ),
-                      FilterChipWidget(
-                        label: 'واي فاي',
-                        isSelected: villaProvider.filters['واي فاي'] ?? false,
-                        onSelected: (_) => villaProvider.toggleFilter('واي فاي'),
-                      ),
-                      FilterChipWidget(
-                        label: 'شواء',
-                        isSelected: villaProvider.filters['شواء'] ?? false,
-                        onSelected: (_) => villaProvider.toggleFilter('شواء'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-          // Horizontal categories
-          Expanded(
-            child: villaProvider.villas.isEmpty
-                ? const Center(child: CircularProgressIndicator())
-                : ListView(
-              padding: const EdgeInsets.only(top: 8),
-              children: [
-                _buildCategorySection(context, "الأعلى تقييماً", villaProvider.getTopRatedVillas()),
-                _buildCategorySection(context, "الأكثر طلباً", villaProvider.getMostPopularVillas()),
-                _buildCategorySection(context, "قريب منك", villaProvider.getNearbyVillas("عمان")),
-              ],
-            ),
-          ),
-        ],
+      backgroundColor: const Color(0xFFF9F9F9),
+      appBar: AppBar(
+        title: const Text("استكشف المزارع", style: TextStyle(color: Colors.black)),
+        backgroundColor: Colors.white,
+        elevation: 1,
+        centerTitle: true,
+        iconTheme: const IconThemeData(color: Colors.black),
       ),
-    );
-  }
+      body: StreamBuilder<List<Villa>>(
+        stream: getVillaStream(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (snapshot.hasError) {
+            return const Center(child: Text("حدث خطأ في تحميل البيانات"));
+          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return const Center(child: Text("لا توجد مزارع متاحة حالياً"));
+          }
 
-  Widget _buildCategorySection(
-      BuildContext context, String title, List<Villa> villas) {
-    if (villas.isEmpty) {
-      return const SizedBox.shrink(); // Don't show empty sections
-    }
+          final villas = snapshot.data!;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Header
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(title,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              TextButton(
-                onPressed: () {
-                  Provider.of<VillaProvider>(context, listen: false)
-                      .setSelectedCategory(title);
-                },
-                child: const Text("عرض الكل"),
-              ),
-            ],
-          ),
-        ),
-
-        // Horizontal list
-        SizedBox(
-          height: 280,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          return ListView.separated(
+            padding: const EdgeInsets.all(16),
             itemCount: villas.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 16),
             itemBuilder: (context, index) {
               final villa = villas[index];
               return GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => VillaDetailsScreen(villa: villa),
-                    ),
-                  );
-                },
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => VillaDetailScreen(villa: villa),
+                  ),
+                ),
                 child: Container(
-                  width: 260,
-                  margin: const EdgeInsets.only(right: 12),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: const [
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
                       BoxShadow(
                         color: Colors.black12,
-                        blurRadius: 6,
-                        offset: Offset(0, 4),
+                        blurRadius: 8,
+                        offset: Offset(0, 3),
                       ),
                     ],
                   ),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Image
                       ClipRRect(
-                        borderRadius:
-                        const BorderRadius.vertical(top: Radius.circular(16)),
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                         child: Image.network(
                           villa.imageUrl,
-                          height: 150,
+                          height: 200,
                           width: double.infinity,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                            height: 150,
+                          errorBuilder: (context, error, stackTrace) => Container(
+                            height: 200,
                             color: Colors.grey[300],
-                            child: const Icon(Icons.broken_image),
+                            child: const Center(child: Icon(Icons.image_not_supported)),
                           ),
                         ),
                       ),
-
-                      // Info
                       Padding(
-                        padding: const EdgeInsets.all(12.0),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              villa.name,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 16),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    villa.name,
+                                    style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                Icon(Icons.chevron_right, color: Colors.grey[600])
+                              ],
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 6),
                             Text(
-                              villa.location,
-                              style: const TextStyle(color: Colors.grey),
+                              '${villa.price} ريال / الليلة',
+                              style: const TextStyle(fontSize: 16, color: Color(0xFF00C853)),
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              '${villa.price.toStringAsFixed(0)} دينار أردني / اليوم',
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold, color: Colors.green),
-                            ),
+                              villa.description.length > 60
+                                  ? villa.description.substring(0, 60) + '...'
+                                  : villa.description,
+                              style: const TextStyle(color: Colors.black54, fontSize: 14),
+                            )
                           ],
                         ),
-                      ),
+                      )
                     ],
                   ),
                 ),
               );
             },
-          ),
-        ),
-      ],
+          );
+        },
+      ),
     );
   }
 }

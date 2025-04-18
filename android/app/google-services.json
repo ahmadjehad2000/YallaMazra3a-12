@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "286265360994-o5ski04iangqq9vei4asc996kvafggdg.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.yalla_mazra3a",
+            "certificate_hash": "a1f5059107c0b5be790cec030c612671c5ee4e66"
+          }
+        },
+        {
           "client_id": "286265360994-p0mc11q2rk3127tkv2e4jghkncu81s7n.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
