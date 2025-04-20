@@ -16,6 +16,7 @@ class _ModeratorScreenState extends State<ModeratorScreen> {
   String? _userId;
   bool _isModerator = false;
   bool _isLoading = true;
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> _reservations = [];
 
   @override
   void initState() {
@@ -26,33 +27,61 @@ class _ModeratorScreenState extends State<ModeratorScreen> {
   Future<void> _loadUserInfo() async {
     final prefs = await SharedPreferences.getInstance();
     _userId = prefs.getString('userId');
+    print('🔍 Loaded userId from SharedPreferences: $_userId');
 
     if (_userId == null) {
-      Navigator.of(context).pushReplacementNamed('/moderator_login');
+      if (mounted) Navigator.of(context).pushReplacementNamed('/moderator_login');
+      return;
+    }
+
+    if (_userId == 'localModerator') {
+      _isModerator = true;
+      setState(() => _isLoading = false);
+      _refreshReservations();
       return;
     }
 
     try {
       final doc = await _firestore.collection('users').doc(_userId).get();
       final data = doc.data();
-      if (data != null && data['isModerator'] == true) {
-        _isModerator = true;
-      }
+      _isModerator = data?['isModerator'] == true;
     } catch (_) {
       _isModerator = false;
     }
 
-    setState(() => _isLoading = false);
+    if (mounted) {
+      setState(() => _isLoading = false);
+      _refreshReservations();
+    }
   }
 
-  Stream<QuerySnapshot<Map<String, dynamic>>> get _reservationsStream {
-    Query<Map<String, dynamic>> query = _firestore.collection('reservations');
+  Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _fetchReservations() async {
+    try {
+      final snapshot = await _firestore.collection('reservations').get();
+      List<QueryDocumentSnapshot<Map<String, dynamic>>> docs = snapshot.docs;
 
-    if (_selectedStatus != 'all') {
-      query = query.where('status', isEqualTo: _selectedStatus);
+      if (_selectedStatus != 'all') {
+        docs = docs.where((doc) => doc.data()['status'] == _selectedStatus).toList();
+      }
+
+      docs.sort((a, b) {
+        final aDate = (a.data()['bookingDateTime'] as Timestamp?)?.toDate() ?? DateTime(2000);
+        final bDate = (b.data()['bookingDateTime'] as Timestamp?)?.toDate() ?? DateTime(2000);
+        return bDate.compareTo(aDate);
+      });
+
+      return docs;
+    } catch (e) {
+      print('❌ Firestore read error: $e');
+      return [];
     }
+  }
 
-    return query.snapshots();
+  Future<void> _refreshReservations() async {
+    final docs = await _fetchReservations();
+    if (mounted) {
+      setState(() => _reservations = docs);
+    }
   }
 
   Future<void> _updateStatus(String id, String newStatus) async {
@@ -71,6 +100,7 @@ class _ModeratorScreenState extends State<ModeratorScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('تم التحديث إلى ${_getStatusLabel(newStatus)}')),
       );
+      _refreshReservations(); // Reload data
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('فشل التحديث: $e')),
@@ -81,7 +111,7 @@ class _ModeratorScreenState extends State<ModeratorScreen> {
   String _getStatusLabel(String? status) {
     switch (status) {
       case 'approved':
-        return 'موافق عليه';
+        return 'مقبول';
       case 'rejected':
         return 'مرفوض';
       default:
@@ -108,12 +138,13 @@ class _ModeratorScreenState extends State<ModeratorScreen> {
               items: const [
                 DropdownMenuItem(value: 'all', child: Text('الكل')),
                 DropdownMenuItem(value: 'pending', child: Text('قيد المراجعة')),
-                DropdownMenuItem(value: 'approved', child: Text('موافق عليه')),
+                DropdownMenuItem(value: 'approved', child: Text('مقبول')),
                 DropdownMenuItem(value: 'rejected', child: Text('مرفوض')),
               ],
               onChanged: (value) {
                 if (value != null) {
                   setState(() => _selectedStatus = value);
+                  _refreshReservations();
                 }
               },
             ),
@@ -121,98 +152,101 @@ class _ModeratorScreenState extends State<ModeratorScreen> {
           const SizedBox(width: 16),
         ],
       ),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: _reservationsStream,
-        builder: (context, snapshot) {
-          if (snapshot.hasError) return Center(child: Text('خطأ: ${snapshot.error}'));
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: RefreshIndicator(
+        onRefresh: _refreshReservations,
+        child: _reservations.isEmpty
+            ? ListView(
+          children: const [
+            SizedBox(height: 200),
+            Center(child: Text('لا توجد حجوزات حالياً')),
+          ],
+        )
 
-          final docs = snapshot.data?.docs ?? [];
-          if (docs.isEmpty) return const Center(child: Text('لا توجد حجوزات حالياً'));
 
-          docs.sort((a, b) {
-            final aDate = (a.data()['bookingDateTime'] as Timestamp?)?.toDate();
-            final bDate = (b.data()['bookingDateTime'] as Timestamp?)?.toDate();
-            return bDate?.compareTo(aDate ?? DateTime(2000)) ?? 0;
-          });
+            : ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: _reservations.length,
+          itemBuilder: (context, index) {
+            final doc = _reservations[index];
+            final data = doc.data();
+            final id = doc.id;
+            final status = data['status'] ?? 'pending';
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: docs.length,
-            itemBuilder: (context, index) {
-              final doc = docs[index];
-              final data = doc.data();
-              final id = doc.id;
-
-              final villa = data['villaName'] ?? 'مزرعة غير معروفة';
-              final phone = data['contactPhone'] ?? 'غير متوفر';
-              final userId = data['userId'] ?? 'غير معروف';
-              final total = data['total']?.toString() ?? '-';
-              final duration = data['duration']?.toString() ?? '-';
-              final status = data['status'] ?? 'pending';
-
-              DateTime? bookingDate;
-              try {
-                bookingDate = (data['bookingDateTime'] as Timestamp?)?.toDate();
-              } catch (_) {}
-
-              return Card(
-                margin: const EdgeInsets.only(bottom: 16),
-                child: ListTile(
-                  contentPadding: const EdgeInsets.all(12),
-                  title: Text(villa),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
+            return Card(
+              margin: const EdgeInsets.only(bottom: 16),
+              elevation: 3,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: status == 'approved'
+                            ? Colors.green.shade100
+                            : status == 'rejected'
+                            ? Colors.red.shade100
+                            : Colors.orange.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'الحالة: ${_getStatusLabel(status)}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
                           color: status == 'approved'
-                              ? Colors.green.shade100
+                              ? Colors.green.shade800
                               : status == 'rejected'
-                              ? Colors.red.shade100
-                              : Colors.orange.shade100,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          'الحالة: ${_getStatusLabel(status)}',
-                          style: TextStyle(
-                            color: status == 'approved'
-                                ? Colors.green.shade800
-                                : status == 'rejected'
-                                ? Colors.red.shade800
-                                : Colors.orange.shade800,
-                            fontWeight: FontWeight.bold,
-                          ),
+                              ? Colors.red.shade800
+                              : Colors.orange.shade800,
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      Text('الهاتف: $phone'),
-                      if (bookingDate != null)
-                        Text('موعد الحجز: ${DateFormat('yyyy-MM-dd – HH:mm').format(bookingDate)}'),
-                      Text('المدة: $duration'),
-                      Text('الإجمالي: $total ريال'),
-                      Text('المستخدم: $userId'),
-                    ],
-                  ),
-                  trailing: _isModerator
-                      ? PopupMenuButton<String>(
-                    onSelected: (newStatus) => _updateStatus(id, newStatus),
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(value: 'approved', child: Text('قبول')),
-                      PopupMenuItem(value: 'rejected', child: Text('رفض')),
-                      PopupMenuItem(value: 'pending', child: Text('قيد المراجعة')),
-                    ],
-                    icon: const Icon(Icons.more_vert),
-                  )
-                      : const Icon(Icons.lock, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'اسم المزرعة: ${data['villaName'] ?? 'غير متوفر'}',
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                    Text(
+                      'رقم الهاتف: ${data['contactPhone'] ?? 'غير متوفر'}',
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                    if (data['bookingDateTime'] is Timestamp)
+                      Text(
+                        'تاريخ الحجز: ${DateFormat('EEEE، d MMMM yyyy – hh:mm a', 'ar').format((data['bookingDateTime'] as Timestamp).toDate())}',
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                    if (data['duration'] != null)
+                      Text(
+                        'المدة: ${data['duration']} ساعة',
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                    if (data['total'] != null)
+                      Text(
+                        'الإجمالي: ${data['total']} ريال',
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                    const SizedBox(height: 10),
+                    if (_isModerator)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: PopupMenuButton<String>(
+                          onSelected: (newStatus) => _updateStatus(id, newStatus),
+                          itemBuilder: (_) => const [
+                            PopupMenuItem(value: 'approved', child: Text('قبول')),
+                            PopupMenuItem(value: 'rejected', child: Text('رفض')),
+                            PopupMenuItem(value: 'pending', child: Text('قيد المراجعة')),
+                          ],
+                          icon: const Icon(Icons.more_vert),
+                        ),
+                      ),
+                  ],
                 ),
-              );
-            },
-          );
-        },
+              ),
+            );
+          },
+        ),
       ),
     );
   }

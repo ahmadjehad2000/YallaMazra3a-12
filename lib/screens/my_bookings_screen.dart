@@ -3,17 +3,43 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 
-class MyBookingsScreen extends StatelessWidget {
+class MyBookingsScreen extends StatefulWidget {
   const MyBookingsScreen({super.key});
 
-  Stream<QuerySnapshot> getUserReservations() {
+  @override
+  State<MyBookingsScreen> createState() => _MyBookingsScreenState();
+}
+
+class _MyBookingsScreenState extends State<MyBookingsScreen> {
+  List<QueryDocumentSnapshot>? _reservations;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadReservations();
+  }
+
+  Future<void> _loadReservations() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return const Stream.empty();
-    return FirebaseFirestore.instance
+    if (uid == null) {
+      setState(() {
+        _reservations = [];
+        _isLoading = false;
+      });
+      return;
+    }
+
+    final query = await FirebaseFirestore.instance
         .collection('reservations')
         .where('userId', isEqualTo: uid)
         .orderBy('timestamp', descending: true)
-        .snapshots();
+        .get();
+
+    setState(() {
+      _reservations = query.docs;
+      _isLoading = false;
+    });
   }
 
   Color _getStatusColor(String status) {
@@ -58,67 +84,63 @@ class MyBookingsScreen extends StatelessWidget {
       ),
       body: Padding(
         padding: EdgeInsets.only(top: statusBarHeight + kToolbarHeight),
-        child: StreamBuilder<QuerySnapshot>(
-          stream: getUserReservations(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            } else if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-              return const Center(child: Text('لا توجد حجوزات حالياً'));
-            }
+        child: RefreshIndicator(
+          onRefresh: _loadReservations,
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : (_reservations == null || _reservations!.isEmpty)
+              ?  ListView(
+            children: [
+              SizedBox(height: 200),
+              Center(child: Text('لا توجد حجوزات حالياً')),
+            ],
+          )
+              : ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: _reservations!.length,
+            itemBuilder: (context, index) {
+              final data = _reservations![index].data() as Map<String, dynamic>;
+              final timestamp = (data['timestamp'] as Timestamp?)?.toDate();
+              final bookingDateTime = (data['bookingDateTime'] as Timestamp?)?.toDate();
+              final status = data['status'] ?? 'pending';
 
-            final reservations = snapshot.data!.docs;
-
-            return ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: reservations.length,
-              itemBuilder: (context, index) {
-                final data = reservations[index].data() as Map<String, dynamic>;
-                final timestamp = (data['timestamp'] as Timestamp?)?.toDate();
-                final bookingDateTime = (data['bookingDateTime'] as Timestamp?)?.toDate();
-                final status = data['status'] ?? 'pending';
-
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+              return Card(
+                margin: const EdgeInsets.only(bottom: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: ListTile(
+                  leading: Icon(Icons.home, color: Theme.of(context).primaryColor),
+                  title: Text(
+                    data['villaName'] ?? 'مزرعة غير معروفة',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  child: ListTile(
-                    leading: Icon(Icons.home, color: Theme.of(context).primaryColor),
-                    title: Text(
-                      data['villaName'] ?? 'مزرعة غير معروفة',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (bookingDateTime != null)
-                          Text('موعد الحجز: ${DateFormat('yyyy-MM-dd – HH:mm').format(bookingDateTime)}'),
-                        if (timestamp != null)
-                          Text('تم الطلب بتاريخ: ${DateFormat('yyyy-MM-dd HH:mm').format(timestamp)}'),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Text(
-                              'الحالة: ',
-                              style: TextStyle(fontWeight: FontWeight.w500),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (bookingDateTime != null)
+                        Text('موعد الحجز: ${DateFormat('yyyy-MM-dd – HH:mm').format(bookingDateTime)}'),
+                      if (timestamp != null)
+                        Text('تم الطلب بتاريخ: ${DateFormat('yyyy-MM-dd HH:mm').format(timestamp)}'),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Text('الحالة: ', style: TextStyle(fontWeight: FontWeight.w500)),
+                          Text(
+                            _getStatusLabel(status),
+                            style: TextStyle(
+                              color: _getStatusColor(status),
+                              fontWeight: FontWeight.bold,
                             ),
-                            Text(
-                              _getStatusLabel(status),
-                              style: TextStyle(
-                                color: _getStatusColor(status),
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        )
-                      ],
-                    ),
+                          ),
+                        ],
+                      )
+                    ],
                   ),
-                );
-              },
-            );
-          },
+                ),
+              );
+            },
+          ),
         ),
       ),
     );
