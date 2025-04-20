@@ -27,7 +27,6 @@ class _ModeratorScreenState extends State<ModeratorScreen> {
   Future<void> _loadUserInfo() async {
     final prefs = await SharedPreferences.getInstance();
     _userId = prefs.getString('userId');
-    print('🔍 Loaded userId from SharedPreferences: $_userId');
 
     if (_userId == null) {
       if (mounted) Navigator.of(context).pushReplacementNamed('/moderator_login');
@@ -65,9 +64,9 @@ class _ModeratorScreenState extends State<ModeratorScreen> {
       }
 
       docs.sort((a, b) {
-        final aDate = (a.data()['bookingDateTime'] as Timestamp?)?.toDate() ?? DateTime(2000);
-        final bDate = (b.data()['bookingDateTime'] as Timestamp?)?.toDate() ?? DateTime(2000);
-        return bDate.compareTo(aDate);
+        final aTime = (a.data()['timestamp'] as Timestamp?)?.toDate() ?? DateTime(2000);
+        final bTime = (b.data()['timestamp'] as Timestamp?)?.toDate() ?? DateTime(2000);
+        return bTime.compareTo(aTime); // Newest first
       });
 
       return docs;
@@ -100,7 +99,7 @@ class _ModeratorScreenState extends State<ModeratorScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('تم التحديث إلى ${_getStatusLabel(newStatus)}')),
       );
-      _refreshReservations(); // Reload data
+      _refreshReservations();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('فشل التحديث: $e')),
@@ -161,8 +160,6 @@ class _ModeratorScreenState extends State<ModeratorScreen> {
             Center(child: Text('لا توجد حجوزات حالياً')),
           ],
         )
-
-
             : ListView.builder(
           padding: const EdgeInsets.all(16),
           itemCount: _reservations.length,
@@ -171,6 +168,9 @@ class _ModeratorScreenState extends State<ModeratorScreen> {
             final data = doc.data();
             final id = doc.id;
             final status = data['status'] ?? 'pending';
+
+            final bookingDate = (data['bookingDateTime'] as Timestamp?)?.toDate();
+            final createdAt = (data['timestamp'] as Timestamp?)?.toDate();
 
             return Card(
               margin: const EdgeInsets.only(bottom: 16),
@@ -181,6 +181,7 @@ class _ModeratorScreenState extends State<ModeratorScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // حالة الحجز
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
@@ -212,9 +213,14 @@ class _ModeratorScreenState extends State<ModeratorScreen> {
                       'رقم الهاتف: ${data['contactPhone'] ?? 'غير متوفر'}',
                       style: const TextStyle(fontSize: 16),
                     ),
-                    if (data['bookingDateTime'] is Timestamp)
+                    if (bookingDate != null)
                       Text(
-                        'تاريخ الحجز: ${DateFormat('EEEE، d MMMM yyyy – hh:mm a', 'ar').format((data['bookingDateTime'] as Timestamp).toDate())}',
+                        'تاريخ الحجز: ${DateFormat('EEEE، d MMMM yyyy – hh:mm a', 'ar').format(bookingDate)}',
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                    if (createdAt != null)
+                      Text(
+                        'تم الطلب بتاريخ: ${DateFormat('yyyy-MM-dd – HH:mm', 'ar').format(createdAt)}',
                         style: const TextStyle(fontSize: 16),
                       ),
                     if (data['duration'] != null)
