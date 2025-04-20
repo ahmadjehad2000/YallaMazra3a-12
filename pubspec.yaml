@@ -26,6 +26,7 @@ dependencies:
   cloud_firestore: ^5.5.0
   flutter_svg: ^2.0.9
 dev_dependencies:
+  flutter_native_splash: ^2.2.9
   flutter_test:
     sdk: flutter
   flutter_lints: ^2.0.1
@@ -36,3 +37,12 @@ flutter:
   assets:
         - assets/logo.png
         - assets/google_logo.png
+        - assets/bg.png
+        - assets/splash_logo.png
+flutter_native_splash:
+  color: "#FFFFFF"
+  image: assets/splash_logo.png
+  android: true
+  ios: true
+  android_gravity: center
+  ios_content_mode: scaleAspectFit

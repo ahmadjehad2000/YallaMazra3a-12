@@ -1,125 +1,329 @@
-// villa_listings_screen.dart
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/villa_provider.dart';
 import '../models/villa.dart';
-import 'villa_detail_screen.dart';
 
-class VillaListingsScreen extends StatelessWidget {
+class VillaListingsScreen extends StatefulWidget {
   const VillaListingsScreen({Key? key}) : super(key: key);
 
-  Stream<List<Villa>> getVillaStream() {
-    return FirebaseFirestore.instance.collection('villas').snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) => Villa.fromMap(doc.data())).toList();
+  @override
+  _VillaListingsScreenState createState() => _VillaListingsScreenState();
+}
+
+class _VillaListingsScreenState extends State<VillaListingsScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  String? _selectedLocation;
+  int? _selectedPriceIndex;
+
+  final List<String> _locations = [
+    'عمان', 'إربد', 'العقبة', 'الزرقاء', 'مأدبا', 'الكرك', 'المفرق'
+  ];
+
+  // Fixed price ranges like Amazon filter
+  final List<Map<String, dynamic>> _priceOptions = [
+    {'label': 'كل الأسعار', 'min': 0.0, 'max': null},
+    {'label': 'أقل من 50 JD', 'min': 0.0, 'max': 50.0},
+    {'label': '50 - 100 JD', 'min': 50.0, 'max': 100.0},
+    {'label': '100 - 200 JD', 'min': 100.0, 'max': 200.0},
+    {'label': '200 - 500 JD', 'min': 200.0, 'max': 500.0},
+    {'label': '500 JD فما فوق', 'min': 500.0, 'max': null},
+  ];
+
+  void _resetFilters() {
+    setState(() {
+      _searchController.clear();
+      _selectedLocation = null;
+      _selectedPriceIndex = 0;
     });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedPriceIndex = 0; // default to all prices
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF9F9F9),
       appBar: AppBar(
-        title: const Text("استكشف المزارع", style: TextStyle(color: Colors.black)),
-        backgroundColor: Colors.white,
-        elevation: 1,
+        title: const Text('المزارع'),
         centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.black),
+        backgroundColor: Theme.of(context).primaryColor,
+        elevation: 2,
       ),
-      body: StreamBuilder<List<Villa>>(
-        stream: getVillaStream(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return const Center(child: Text("حدث خطأ في تحميل البيانات"));
-          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text("لا توجد مزارع متاحة حالياً"));
+      body: Consumer<VillaProvider>(
+        builder: (context, provider, _) {
+          final allVillas = provider.villas;
+          if (allVillas.isEmpty) {
+            return const Center(child: Text('لا توجد فيلات'));
           }
 
-          final villas = snapshot.data!;
+          // Filter logic
+          final query = _searchController.text.trim().toLowerCase();
+          final priceOpt = _priceOptions[_selectedPriceIndex!];
 
-          return ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: villas.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 16),
-            itemBuilder: (context, index) {
-              final villa = villas[index];
-              return GestureDetector(
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => VillaDetailScreen(villa: villa),
-                  ),
-                ),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black12,
-                        blurRadius: 8,
-                        offset: Offset(0, 3),
+          final filtered = allVillas.where((v) {
+            final matchesQuery = query.isEmpty ||
+                v.name.toLowerCase().contains(query) ||
+                v.description.toLowerCase().contains(query) ||
+                v.location.toLowerCase().contains(query);
+            final matchesLocation =
+                _selectedLocation == null || v.location == _selectedLocation;
+            final min = priceOpt['min'] as double;
+            final max = priceOpt['max'] as double?;
+            final matchesPrice =
+                v.price >= min && (max == null || v.price <= max);
+            return matchesQuery && matchesLocation && matchesPrice;
+          }).toList();
+
+          return Column(
+            children: [
+              // Filters Section
+              Container(
+                color: Colors.white,
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        // Search field
+                        Expanded(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: TextField(
+                              controller: _searchController,
+                              decoration: const InputDecoration(
+                                hintText: 'ابحث بالاسم أو الوصف أو الموقع',
+                                border: InputBorder.none,
+                                prefixIcon: Icon(Icons.search),
+                              ),
+                              onChanged: (_) => setState(() {}),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Location dropdown
+                        DropdownButton<String>(
+                          value: _selectedLocation,
+                          hint: const Text('المدينة'),
+                          items: [null, ..._locations].map((loc) {
+                            return DropdownMenuItem<String>(
+                              value: loc,
+                              child: Text(loc ?? 'الكل'),
+                            );
+                          }).toList(),
+                          onChanged: (val) => setState(() => _selectedLocation = val),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.refresh),
+                          tooltip: 'إعادة ضبط الفلاتر',
+                          onPressed: _resetFilters,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    // Price Options (Amazon style)
+                    SizedBox(
+                      height: 40,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _priceOptions.length,
+                        itemBuilder: (ctx, i) {
+                          final opt = _priceOptions[i];
+                          final selected = i == _selectedPriceIndex;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: ChoiceChip(
+                              label: Text(opt['label'] as String),
+                              selected: selected,
+                              onSelected: (_) => setState(() => _selectedPriceIndex = i),
+                              selectedColor: Theme.of(context).primaryColor,
+                              backgroundColor: Colors.grey.shade200,
+                              labelStyle: TextStyle(
+                                color: selected ? Colors.white : Colors.black87,
+                              ),
+                            ),
+                          );
+                        },
                       ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      ClipRRect(
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                        child: Image.network(
-                          villa.imageUrl,
-                          height: 200,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Container(
-                            height: 200,
-                            color: Colors.grey[300],
-                            child: const Center(child: Icon(Icons.image_not_supported)),
+                    ),
+                  ],
+                ),
+              ),
+              // Listings
+              Expanded(
+                child: ListView.separated(
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  itemCount: filtered.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (ctx, i) {
+                    final v = filtered[i];
+                    return Card(
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () {},
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            children: [
+                              // Image with placeholder
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: v.imageUrl.isNotEmpty
+                                    ? Image.network(
+                                  v.imageUrl,
+                                  width: 100,
+                                  height: 100,
+                                  fit: BoxFit.cover,
+                                  loadingBuilder:
+                                      (context, child, progress) {
+                                    if (progress == null) return child;
+                                    return Container(
+                                      width: 100,
+                                      height: 100,
+                                      color: Colors.grey.shade200,
+                                      child: Center(
+                                        child: CircularProgressIndicator(
+                                          value: progress
+                                              .expectedTotalBytes !=
+                                              null
+                                              ? progress
+                                              .cumulativeBytesLoaded /
+                                              progress.expectedTotalBytes!
+                                              : null,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  errorBuilder:
+                                      (context, error, stack) {
+                                    return Container(
+                                      width: 100,
+                                      height: 100,
+                                      color: Colors.grey.shade300,
+                                      child: const Icon(
+                                        Icons.broken_image,
+                                        size: 40,
+                                        color: Colors.grey,
+                                      ),
+                                    );
+                                  },
+                                )
+                                    : Container(
+                                  width: 100,
+                                  height: 100,
+                                  color: Colors.grey.shade300,
+                                  child: const Icon(
+                                    Icons.home,
+                                    size: 40,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              // Details
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      v.name,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.location_on,
+                                          size: 14,
+                                          color: Colors.grey,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          v.location,
+                                          style: const TextStyle(
+                                              color: Colors.grey),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${v.price.toStringAsFixed(0)} JD / ليلة',
+                                      style: TextStyle(
+                                          color: Theme.of(context)
+                                              .primaryColor),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Row(
+                                      children: [
+                                        if (v.hasPool)
+                                          const Tooltip(
+                                            message: 'مسبح',
+                                            child: Icon(
+                                              Icons.pool,
+                                              size: 18,
+                                            ),
+                                          ),
+                                        if (v.hasWifi)
+                                          const Padding(
+                                            padding: EdgeInsets.only(
+                                                left: 8.0),
+                                            child: Tooltip(
+                                              message: 'واي فاي',
+                                              child: Icon(
+                                                Icons.wifi,
+                                                size: 18,
+                                              ),
+                                            ),
+                                          ),
+                                        if (v.hasBarbecue)
+                                          const Padding(
+                                            padding: EdgeInsets.only(
+                                                left: 8.0),
+                                            child: Tooltip(
+                                              message: 'شواء',
+                                              child: Icon(
+                                                Icons.outdoor_grill,
+                                                size: 18,
+                                              ),
+                                            ),
+                                          ),
+                                        const Spacer(),
+                                        Text('سعة: ${v.capacity}'),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    villa.name,
-                                    style: const TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                Icon(Icons.chevron_right, color: Colors.grey[600])
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              '${villa.price} ريال / الليلة',
-                              style: const TextStyle(fontSize: 16, color: Color(0xFF00C853)),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              villa.description.length > 60
-                                  ? villa.description.substring(0, 60) + '...'
-                                  : villa.description,
-                              style: const TextStyle(color: Colors.black54, fontSize: 14),
-                            )
-                          ],
-                        ),
-                      )
-                    ],
-                  ),
+                    );
+                  },
                 ),
-              );
-            },
+              ),
+            ],
           );
         },
       ),

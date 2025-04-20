@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Background for splash and default windows -->
+    <color name="white">#FFFFFF</color>
+
+    <!-- Your app’s primary palette -->
+    <color name="primary">#00C853</color>
+    <color name="primaryDark">#009624</color>
+    <color name="primaryLight">#5EFC82</color>
+    <color name="onPrimary">#FFFFFF</color>
+
+    <!-- Surface/background colors -->
+    <color name="surface">#F1F8E9</color>
+    <color name="onSurface">#212121</color>
+
+    <!-- Error colors -->
+    <color name="error">#D32F2F</color>
+    <color name="onError">#FFFFFF</color>
+</resources>

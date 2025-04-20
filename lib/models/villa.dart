@@ -1,3 +1,5 @@
+// lib/models/villa.dart
+
 class Villa {
   final String id;
   final String name;
@@ -27,17 +29,21 @@ class Villa {
 
   factory Villa.fromMap(Map<String, dynamic> map) {
     return Villa(
-      id: map['id'] ?? '',
-      name: map['name'] ?? '',
-      location: map['location'] ?? '',
-      imageUrl: map['image_url'] ?? '',
-      description: map['description'] ?? '',
-      price: (map['price'] ?? 0).toDouble(),
-      rating: (map['rating'] ?? 0).toDouble(),
-      capacity: (map['capacity'] ?? 0).toInt(),
-      hasPool: map['hasPool'] ?? false,
-      hasWifi: map['hasWifi'] ?? false,
-      hasBarbecue: map['hasBarbecue'] ?? false,
+      id: map['id'] as String? ?? '',
+      name: map['name'] as String? ?? '',
+      location: map['location'] as String? ?? '',
+      imageUrl: map['image_url'] as String? ?? '',
+      description: map['description'] as String? ?? '',
+      price: (map['price'] is int)
+          ? (map['price'] as int).toDouble()
+          : map['price'] as double? ?? 0.0,
+      rating: (map['rating'] is int)
+          ? (map['rating'] as int).toDouble()
+          : map['rating'] as double? ?? 0.0,
+      capacity: map['capacity'] as int? ?? 0,
+      hasPool: map['hasPool'] as bool? ?? false,
+      hasWifi: map['hasWifi'] as bool? ?? false,
+      hasBarbecue: map['hasBarbecue'] as bool? ?? false,
     );
   }
 
