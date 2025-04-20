@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../providers/auth_provider.dart';
 import 'main_app_screen.dart';
 import 'register_screen.dart';
@@ -28,36 +29,109 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
+
     setState(() => _isLoading = true);
+    final rawPhone = _phoneController.text.trim();
+    final phone = rawPhone.startsWith("+962") ? rawPhone.replaceFirst("+962", "") : rawPhone;
+    final password = _passwordController.text.trim();
 
-    final success = await Provider.of<AuthProvider>(context, listen: false)
-        .signInWithPhonePassword(
-      _phoneController.text.trim(),
-      _passwordController.text.trim(),
-    );
+    try {
+      // Step 1: Try to find the user document by phone
+      final usersSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('phoneNumber', isEqualTo: phone)
+          .limit(1)
+          .get();
 
-    setState(() => _isLoading = false);
+      if (usersSnapshot.docs.isNotEmpty) {
+        final userDoc = usersSnapshot.docs.first;
+        final isModerator = userDoc['isModerator'] == true;
+        final isAdmin = userDoc['isAdmin'] == true;
 
-    if (success && mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const MainAppScreen()),
-      );
+        // Step 2: If user is mod/admin, validate password from user_auth
+        if (isModerator || isAdmin) {
+          final authSnapshot = await FirebaseFirestore.instance
+              .collection('user_auth')
+              .where('phone', isEqualTo: phone)
+              .where('password', isEqualTo: password)
+              .limit(1)
+              .get();
+
+          if (authSnapshot.docs.isNotEmpty) {
+            if (!mounted) return;
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) => MainAppScreen(isModerator: true),
+              ),
+            );
+            return;
+          } else {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('كلمة المرور غير صحيحة للمشرف')),
+              );
+            }
+            setState(() => _isLoading = false);
+            return;
+          }
+        }
+      }
+
+      // Step 3: Fallback to normal user FirebaseAuth login
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final success = await authProvider.signInWithPhonePassword(phone, password);
+
+      if (success && mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const MainAppScreen(), // no need to pass isModerator for normal
+          ),
+        );
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('فشل تسجيل الدخول')),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Login error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('حدث خطأ: ${e.toString()}')),
+        );
+      }
     }
+
+    if (mounted) setState(() => _isLoading = false);
   }
 
   Future<void> _signInWithGoogle() async {
     setState(() => _isGoogleLoading = true);
 
-    final success = await Provider.of<AuthProvider>(context, listen: false)
-        .signInWithGoogle();
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final success = await authProvider.signInWithGoogle();
+
+    if (!mounted) return;
 
     setState(() => _isGoogleLoading = false);
 
-    if (success && mounted) {
+    if (success) {
+      final uid = authProvider.currentUser?.id;
+      bool isMod = false;
+
+      if (uid != null) {
+        final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+        isMod = userDoc.data()?['isModerator'] == true || userDoc.data()?['isAdmin'] == true;
+      }
+
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const MainAppScreen()),
+        MaterialPageRoute(
+          builder: (_) => MainAppScreen(isModerator: isMod),
+        ),
       );
     }
   }
@@ -104,11 +178,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         border: const OutlineInputBorder(),
                         prefixIcon: const Icon(Icons.lock),
                         suffixIcon: IconButton(
-                          icon: Icon(_isPasswordVisible
-                              ? Icons.visibility_off
-                              : Icons.visibility),
-                          onPressed: () => setState(
-                                  () => _isPasswordVisible = !_isPasswordVisible),
+                          icon: Icon(
+                            _isPasswordVisible
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                          ),
+                          onPressed: () =>
+                              setState(() => _isPasswordVisible = !_isPasswordVisible),
                         ),
                       ),
                       validator: (value) =>
@@ -172,9 +248,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           height: 24,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Colors.grey,
-                            ),
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
                           ),
                         )
                             : Image.asset(
@@ -208,9 +282,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           onPressed: () {
                             Navigator.push(
                               context,
-                              MaterialPageRoute(
-                                builder: (_) => const RegisterScreen(),
-                              ),
+                              MaterialPageRoute(builder: (_) => const RegisterScreen()),
                             );
                           },
                           child: const Text(

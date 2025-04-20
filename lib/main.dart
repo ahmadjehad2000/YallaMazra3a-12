@@ -43,20 +43,29 @@ class MyApp extends StatelessWidget {
           ),
         ),
         debugShowCheckedModeBanner: false,
-        home: Consumer<AuthProvider>(
-          builder: (context, authProvider, child) {
-            if (authProvider.status == AuthStatus.initial) {
-              return const Scaffold(
-                body: Center(child: CircularProgressIndicator()),
-              );
-            } else if (authProvider.isAuthenticated) {
-              return const MainAppScreen();
-            } else {
-              return const LoginScreen();
-            }
-          },
-        ),
+        home: const AuthChecker(), // Start here after native splash
       ),
+    );
+  }
+}
+
+class AuthChecker extends StatelessWidget {
+  const AuthChecker({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<AuthProvider>(
+      builder: (context, authProvider, child) {
+        if (authProvider.status == AuthStatus.initial) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        } else if (authProvider.isAuthenticated) {
+          return const MainAppScreen();
+        } else {
+          return const LoginScreen();
+        }
+      },
     );
   }
 }

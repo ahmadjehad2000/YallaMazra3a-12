@@ -15,6 +15,8 @@ class AuthProvider extends ChangeNotifier {
   User? get currentUser => _currentUser;
   String get errorMessage => _errorMessage;
   bool get isAuthenticated => _status == AuthStatus.authenticated;
+  bool get isModerator => _currentUser?.isModerator ?? false;
+  bool get isAdmin => _currentUser?.isAdmin ?? false;
 
   AuthProvider() {
     _initializeAuth();
@@ -39,7 +41,6 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Register with phone/password
   Future<bool> registerWithPhonePassword({
     required String name,
     required String email,
@@ -61,7 +62,6 @@ class AuthProvider extends ChangeNotifier {
       if (user != null) {
         _currentUser = user;
         _status = AuthStatus.authenticated;
-        _errorMessage = '';
         notifyListeners();
         return true;
       } else {
@@ -74,17 +74,15 @@ class AuthProvider extends ChangeNotifier {
       _errorMessage = 'حدث خطأ أثناء التسجيل: ${e.toString()}';
       _status = AuthStatus.unauthenticated;
       notifyListeners();
-      rethrow; // Re-throw for more specific handling in UI
+      rethrow;
     }
   }
 
-  // Manual override login method
   void setAuthenticated(bool value) {
     _status = value ? AuthStatus.authenticated : AuthStatus.unauthenticated;
     notifyListeners();
   }
 
-  // Google sign in
   Future<bool> signInWithGoogle() async {
     try {
       _status = AuthStatus.initial;
@@ -96,7 +94,6 @@ class AuthProvider extends ChangeNotifier {
       if (user != null) {
         _currentUser = user;
         _status = AuthStatus.authenticated;
-        _errorMessage = '';
         notifyListeners();
         return true;
       } else {
@@ -113,17 +110,10 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // Phone/password sign in
   Future<bool> signInWithPhonePassword(String phone, String password) async {
     try {
-      if (phone.isEmpty || password.isEmpty) {
-        _errorMessage = 'الرجاء إدخال رقم الهاتف وكلمة المرور';
-        notifyListeners();
-        return false;
-      }
-
-      _status = AuthStatus.initial;
       _errorMessage = '';
+      _status = AuthStatus.initial;
       notifyListeners();
 
       final user = await _authService.signInWithPhonePassword(phone, password);
@@ -131,7 +121,6 @@ class AuthProvider extends ChangeNotifier {
       if (user != null) {
         _currentUser = user;
         _status = AuthStatus.authenticated;
-        _errorMessage = '';
         notifyListeners();
         return true;
       } else {
@@ -148,7 +137,6 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // Sign out
   Future<void> signOut() async {
     try {
       await _authService.signOut();
@@ -160,7 +148,6 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // Toggle favorite villa
   Future<void> toggleFavorite(String villaId) async {
     if (_currentUser == null) return;
 
@@ -179,7 +166,6 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Check if villa is favorite
   bool isFavorite(String villaId) {
     return _currentUser?.favoriteVillas.contains(villaId) ?? false;
   }

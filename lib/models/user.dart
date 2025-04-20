@@ -7,6 +7,8 @@ class User {
   final bool isGoogleSignIn;
   final List<String> favoriteVillas;
   final List<String> bookings;
+  final bool isModerator;
+  final bool isAdmin;
 
   User({
     required this.id,
@@ -17,6 +19,8 @@ class User {
     required this.isGoogleSignIn,
     this.favoriteVillas = const [],
     this.bookings = const [],
+    this.isModerator = false,
+    this.isAdmin = false,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -26,9 +30,11 @@ class User {
       email: json['email'],
       phoneNumber: json['phoneNumber'],
       photoUrl: json['photoUrl'],
-      isGoogleSignIn: json['isGoogleSignIn'],
+      isGoogleSignIn: json['isGoogleSignIn'] ?? false,
       favoriteVillas: List<String>.from(json['favoriteVillas'] ?? []),
       bookings: List<String>.from(json['bookings'] ?? []),
+      isModerator: json['isModerator'] ?? false,
+      isAdmin: json['isAdmin'] ?? false,
     );
   }
 
@@ -42,6 +48,8 @@ class User {
       'isGoogleSignIn': isGoogleSignIn,
       'favoriteVillas': favoriteVillas,
       'bookings': bookings,
+      'isModerator': isModerator,
+      'isAdmin': isAdmin,
     };
   }
 
@@ -54,6 +62,8 @@ class User {
     bool? isGoogleSignIn,
     List<String>? favoriteVillas,
     List<String>? bookings,
+    bool? isModerator,
+    bool? isAdmin,
   }) {
     return User(
       id: id ?? this.id,
@@ -64,6 +74,8 @@ class User {
       isGoogleSignIn: isGoogleSignIn ?? this.isGoogleSignIn,
       favoriteVillas: favoriteVillas ?? this.favoriteVillas,
       bookings: bookings ?? this.bookings,
+      isModerator: isModerator ?? this.isModerator,
+      isAdmin: isAdmin ?? this.isAdmin,
     );
   }
 }

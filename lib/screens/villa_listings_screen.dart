@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/villa_provider.dart';
 import '../models/villa.dart';
+import 'villa_detail_screen.dart';
 
 class VillaListingsScreen extends StatefulWidget {
   const VillaListingsScreen({Key? key}) : super(key: key);
@@ -94,7 +95,6 @@ class _VillaListingsScreenState extends State<VillaListingsScreen> {
                   children: [
                     Row(
                       children: [
-                        // Search field
                         Expanded(
                           child: DecoratedBox(
                             decoration: BoxDecoration(
@@ -113,7 +113,6 @@ class _VillaListingsScreenState extends State<VillaListingsScreen> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        // Location dropdown
                         DropdownButton<String>(
                           value: _selectedLocation,
                           hint: const Text('المدينة'),
@@ -133,7 +132,6 @@ class _VillaListingsScreenState extends State<VillaListingsScreen> {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    // Price Options (Amazon style)
                     SizedBox(
                       height: 40,
                       child: ListView.builder(
@@ -164,8 +162,7 @@ class _VillaListingsScreenState extends State<VillaListingsScreen> {
               // Listings
               Expanded(
                 child: ListView.separated(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   itemCount: filtered.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (ctx, i) {
@@ -177,12 +174,17 @@ class _VillaListingsScreenState extends State<VillaListingsScreen> {
                       ),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(12),
-                        onTap: () {},
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => VillaDetailScreen(villa: v),
+                            ),
+                          );
+                        },
                         child: Padding(
                           padding: const EdgeInsets.all(12),
                           child: Row(
                             children: [
-                              // Image with placeholder
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(8),
                                 child: v.imageUrl.isNotEmpty
@@ -191,8 +193,7 @@ class _VillaListingsScreenState extends State<VillaListingsScreen> {
                                   width: 100,
                                   height: 100,
                                   fit: BoxFit.cover,
-                                  loadingBuilder:
-                                      (context, child, progress) {
+                                  loadingBuilder: (context, child, progress) {
                                     if (progress == null) return child;
                                     return Container(
                                       width: 100,
@@ -200,19 +201,15 @@ class _VillaListingsScreenState extends State<VillaListingsScreen> {
                                       color: Colors.grey.shade200,
                                       child: Center(
                                         child: CircularProgressIndicator(
-                                          value: progress
-                                              .expectedTotalBytes !=
-                                              null
-                                              ? progress
-                                              .cumulativeBytesLoaded /
+                                          value: progress.expectedTotalBytes != null
+                                              ? progress.cumulativeBytesLoaded /
                                               progress.expectedTotalBytes!
                                               : null,
                                         ),
                                       ),
                                     );
                                   },
-                                  errorBuilder:
-                                      (context, error, stack) {
+                                  errorBuilder: (context, error, stack) {
                                     return Container(
                                       width: 100,
                                       height: 100,
@@ -237,11 +234,9 @@ class _VillaListingsScreenState extends State<VillaListingsScreen> {
                                 ),
                               ),
                               const SizedBox(width: 12),
-                              // Details
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment:
-                                  CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       v.name,
@@ -261,8 +256,7 @@ class _VillaListingsScreenState extends State<VillaListingsScreen> {
                                         const SizedBox(width: 4),
                                         Text(
                                           v.location,
-                                          style: const TextStyle(
-                                              color: Colors.grey),
+                                          style: const TextStyle(color: Colors.grey),
                                         ),
                                       ],
                                     ),
@@ -270,8 +264,7 @@ class _VillaListingsScreenState extends State<VillaListingsScreen> {
                                     Text(
                                       '${v.price.toStringAsFixed(0)} JD / ليلة',
                                       style: TextStyle(
-                                          color: Theme.of(context)
-                                              .primaryColor),
+                                          color: Theme.of(context).primaryColor),
                                     ),
                                     const SizedBox(height: 6),
                                     Row(
@@ -279,33 +272,22 @@ class _VillaListingsScreenState extends State<VillaListingsScreen> {
                                         if (v.hasPool)
                                           const Tooltip(
                                             message: 'مسبح',
-                                            child: Icon(
-                                              Icons.pool,
-                                              size: 18,
-                                            ),
+                                            child: Icon(Icons.pool, size: 18),
                                           ),
                                         if (v.hasWifi)
                                           const Padding(
-                                            padding: EdgeInsets.only(
-                                                left: 8.0),
+                                            padding: EdgeInsets.only(left: 8.0),
                                             child: Tooltip(
                                               message: 'واي فاي',
-                                              child: Icon(
-                                                Icons.wifi,
-                                                size: 18,
-                                              ),
+                                              child: Icon(Icons.wifi, size: 18),
                                             ),
                                           ),
                                         if (v.hasBarbecue)
                                           const Padding(
-                                            padding: EdgeInsets.only(
-                                                left: 8.0),
+                                            padding: EdgeInsets.only(left: 8.0),
                                             child: Tooltip(
                                               message: 'شواء',
-                                              child: Icon(
-                                                Icons.outdoor_grill,
-                                                size: 18,
-                                              ),
+                                              child: Icon(Icons.outdoor_grill, size: 18),
                                             ),
                                           ),
                                         const Spacer(),

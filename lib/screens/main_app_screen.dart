@@ -1,24 +1,66 @@
-import 'package:flutter/material.dart';
 import 'dart:math';
+import 'package:flutter/material.dart';
 import 'package:yalla_mazra3a/screens/my_bookings_screen.dart';
 import 'package:yalla_mazra3a/screens/profile_screen.dart';
 import 'package:yalla_mazra3a/screens/villa_listings_screen.dart';
+import 'package:yalla_mazra3a/screens/moderator_screen.dart';
+
 
 class MainAppScreen extends StatefulWidget {
-  const MainAppScreen({super.key});
+  final bool isModerator;
+
+  const MainAppScreen({Key? key, this.isModerator = false}) : super(key: key);
 
   @override
   State<MainAppScreen> createState() => _MainAppScreenState();
 }
 
-class _MainAppScreenState extends State<MainAppScreen> {
+class _MainAppScreenState extends State<MainAppScreen> with TickerProviderStateMixin {
   int _currentIndex = 2;
-  final List<Widget> _screens = const [
-    ServicesScreen(),
-    MyBookingsScreen(),
-    HomeContent(),
-    ProfileScreen(),
-  ];
+  late final AnimationController _switchController;
+  late final List<Widget> _screens;
+  late final List<BottomNavigationBarItem> _tabs;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _screens = [
+      const ServicesScreen(),
+      const MyBookingsScreen(),
+      const HomeContent(),
+      const ProfileScreen(),
+      if (widget.isModerator) const ModeratorScreen(),
+    ];
+
+    _tabs = [
+      const BottomNavigationBarItem(icon: Icon(Icons.grid_view_outlined), label: 'خدماتي'),
+      const BottomNavigationBarItem(icon: Icon(Icons.work_outline), label: 'حجوزاتي'),
+      const BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: 'الصفحة الرئيسية'),
+      const BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'بروفايل'),
+      if (widget.isModerator)
+        const BottomNavigationBarItem(icon: Icon(Icons.build_circle_outlined), label: 'شغلي'),
+    ];
+
+    _switchController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _switchController.dispose();
+    super.dispose();
+  }
+
+  void _onTabTapped(int index) {
+    if (index == _currentIndex) return;
+    _switchController.reverse().then((_) {
+      setState(() => _currentIndex = index);
+      _switchController.forward();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,10 +71,7 @@ class _MainAppScreenState extends State<MainAppScreen> {
           icon: const Icon(Icons.article_outlined),
           onPressed: () {},
         ),
-        title: const Text(
-          'يلا مزرعة',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
+        title: const Text('يلا مزرعة', style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
         actions: [
           IconButton(
@@ -46,63 +85,108 @@ class _MainAppScreenState extends State<MainAppScreen> {
       ),
       body: Stack(
         children: [
-          // Background image
           Positioned.fill(
-            child: Image.asset(
-              'assets/bg.png',
-              fit: BoxFit.cover,
+            child: Image.asset('assets/bg.png', fit: BoxFit.cover),
+          ),
+          Positioned.fill(
+            child: Container(color: Colors.white.withOpacity(0.7)),
+          ),
+          SafeArea(
+            child: FadeTransition(
+              opacity: _switchController.drive(
+                Tween(begin: 0.0, end: 1.0).chain(CurveTween(curve: Curves.easeInOut)),
+              ),
+              child: _screens[_currentIndex],
             ),
           ),
-          // Semi-transparent overlay for readability
-          Positioned.fill(
-            child: Container(
-              color: Colors.white.withOpacity(0.7),
-            ),
-          ),
-          // Main content
-          SafeArea(child: _screens[_currentIndex]),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
+        onTap: _onTabTapped,
         type: BottomNavigationBarType.fixed,
         backgroundColor: Colors.white.withOpacity(0.9),
         selectedItemColor: Theme.of(context).primaryColor,
         unselectedItemColor: Colors.grey,
         showUnselectedLabels: true,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.grid_view_outlined),
-            label: 'خدماتي',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.work_outline),
-            label: 'حجوزاتي',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            label: 'الصفحة الرئيسية',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            label: 'بروفايل',
-          ),
-        ],
+        items: _tabs,
       ),
     );
   }
 }
 
 class ServicesScreen extends StatelessWidget {
-  const ServicesScreen({super.key});
+  const ServicesScreen({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return const Center(
-      child: Text(
-        'خدماتي',
-        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+      child: Text('خدماتي', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+    );
+  }
+}
+
+class ModeratorScreen extends StatelessWidget {
+  const ModeratorScreen({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Text('شغلي', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+    );
+  }
+}
+
+class HomeContent extends StatelessWidget {
+  const HomeContent({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: SizedBox(
+        width: 300,
+        height: 300,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            BigCircleButton(
+              icon: Icons.location_on_outlined,
+              label: 'يلا',
+              onTap: () {
+                Navigator.of(context).push(
+                  PageRouteBuilder(
+                    transitionDuration: const Duration(milliseconds: 500),
+                    pageBuilder: (_, __, ___) => const VillaListingsScreen(),
+                    transitionsBuilder: (_, anim, __, child) {
+                      return FadeTransition(opacity: anim, child: child);
+                    },
+                  ),
+                );
+              },
+            ),
+            PlanetButton(
+              icon: Icons.visibility_outlined,
+              label: 'رؤيتنا',
+              angle: -pi / 4,
+              radius: 120,
+              onTap: () {},
+            ),
+            PlanetButton(
+              icon: Icons.video_library_outlined,
+              label: 'فيديوهات',
+              angle: pi / 4,
+              radius: 120,
+              onTap: () {},
+            ),
+            PlanetButton(
+              icon: Icons.lightbulb_outline,
+              label: 'نصائح',
+              angle: pi,
+              radius: 120,
+              onTap: () {},
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -114,11 +198,11 @@ class BigCircleButton extends StatelessWidget {
   final VoidCallback onTap;
 
   const BigCircleButton({
-    super.key,
+    Key? key,
     required this.icon,
     required this.label,
     required this.onTap,
-  });
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -173,19 +257,20 @@ class PlanetButton extends StatelessWidget {
   final VoidCallback onTap;
 
   const PlanetButton({
-    super.key,
+    Key? key,
     required this.icon,
     required this.label,
     required this.angle,
     required this.radius,
     required this.onTap,
-  });
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     const double size = 60;
     final double x = radius * cos(angle);
     final double y = radius * sin(angle);
+
     return Transform.translate(
       offset: Offset(x, y),
       child: GestureDetector(
@@ -209,63 +294,9 @@ class PlanetButton extends StatelessWidget {
             children: [
               Icon(icon, size: 28, color: Theme.of(context).primaryColor),
               const SizedBox(height: 4),
-              Text(
-                label,
-                style: const TextStyle(fontSize: 12),
-              ),
+              Text(label, style: const TextStyle(fontSize: 12)),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class HomeContent extends StatelessWidget {
-  const HomeContent({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: SizedBox(
-        width: 300,
-        height: 300,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            BigCircleButton(
-              icon: Icons.location_on_outlined,
-              label: 'يلا',
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const VillaListingsScreen(),
-                  ),
-                );
-              },
-            ),
-            PlanetButton(
-              icon: Icons.visibility_outlined,
-              label: 'رؤيتنا',
-              angle: -pi / 4,
-              radius: 120,
-              onTap: () {},
-            ),
-            PlanetButton(
-              icon: Icons.video_library_outlined,
-              label: 'فيديوهات',
-              angle: pi / 4,
-              radius: 120,
-              onTap: () {},
-            ),
-            PlanetButton(
-              icon: Icons.lightbulb_outline,
-              label: 'نصائح',
-              angle: pi,
-              radius: 120,
-              onTap: () {},
-            ),
-          ],
         ),
       ),
     );

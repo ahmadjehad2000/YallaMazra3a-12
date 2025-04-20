@@ -6,7 +6,7 @@
 
     <application
         android:name="${applicationName}"
-        android:label="yalla_mazra3a"
+        android:label="يلا مزرعة"
         android:icon="@mipmap/ic_launcher"
         android:theme="@style/LaunchTheme">  <!-- LaunchTheme shows your splash -->
 

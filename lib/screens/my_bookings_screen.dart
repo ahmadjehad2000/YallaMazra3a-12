@@ -8,9 +8,7 @@ class MyBookingsScreen extends StatelessWidget {
 
   Stream<QuerySnapshot> getUserReservations() {
     final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) {
-      return const Stream.empty();
-    }
+    if (uid == null) return const Stream.empty();
     return FirebaseFirestore.instance
         .collection('reservations')
         .where('userId', isEqualTo: uid)
@@ -18,58 +16,110 @@ class MyBookingsScreen extends StatelessWidget {
         .snapshots();
   }
 
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'approved':
+        return Colors.green;
+      case 'rejected':
+        return Colors.red;
+      case 'pending':
+      default:
+        return Colors.orange;
+    }
+  }
+
+  String _getStatusLabel(String status) {
+    switch (status) {
+      case 'approved':
+        return 'موافق عليه';
+      case 'rejected':
+        return 'مرفوض';
+      case 'pending':
+      default:
+        return 'قيد المراجعة';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final statusBarHeight = MediaQuery.of(context).padding.top;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('حجوزاتي'),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0.5,
+      extendBodyBehindAppBar: true,
+      appBar: PreferredSize(
+        preferredSize: Size.fromHeight(statusBarHeight + kToolbarHeight),
+        child: AppBar(
+          backgroundColor: Theme.of(context).primaryColor,
+          elevation: 0,
+          centerTitle: true,
+          foregroundColor: Colors.white,
+          title: const Text('حجوزاتي'),
+        ),
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: getUserReservations(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text('لا توجد حجوزات حالياً'));
-          }
+      body: Padding(
+        padding: EdgeInsets.only(top: statusBarHeight + kToolbarHeight),
+        child: StreamBuilder<QuerySnapshot>(
+          stream: getUserReservations(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            } else if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+              return const Center(child: Text('لا توجد حجوزات حالياً'));
+            }
 
-          final reservations = snapshot.data!.docs;
+            final reservations = snapshot.data!.docs;
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: reservations.length,
-            itemBuilder: (context, index) {
-              final data = reservations[index].data() as Map<String, dynamic>;
-              final timestamp = (data['timestamp'] as Timestamp?)?.toDate();
-              final bookingDate = (data['bookingDate'] as Timestamp?)?.toDate();
+            return ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: reservations.length,
+              itemBuilder: (context, index) {
+                final data = reservations[index].data() as Map<String, dynamic>;
+                final timestamp = (data['timestamp'] as Timestamp?)?.toDate();
+                final bookingDateTime = (data['bookingDateTime'] as Timestamp?)?.toDate();
+                final status = data['status'] ?? 'pending';
 
-              return Card(
-                margin: const EdgeInsets.only(bottom: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: ListTile(
-                  title: Text(data['villaName'] ?? 'مزرعة غير معروفة'),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('معرّف: ${data['villaId'] ?? '-'}'),
-                      if (bookingDate != null)
-                        Text('تاريخ الحجز: ${DateFormat('yyyy-MM-dd').format(bookingDate)}'),
-                      if (timestamp != null)
-                        Text('أُنشئ في: ${timestamp.toLocal().toString().substring(0, 16)}'),
-                    ],
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  leading: const Icon(Icons.home, color: Colors.green),
-                ),
-              );
-            },
-          );
-        },
+                  child: ListTile(
+                    leading: Icon(Icons.home, color: Theme.of(context).primaryColor),
+                    title: Text(
+                      data['villaName'] ?? 'مزرعة غير معروفة',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (bookingDateTime != null)
+                          Text('موعد الحجز: ${DateFormat('yyyy-MM-dd – HH:mm').format(bookingDateTime)}'),
+                        if (timestamp != null)
+                          Text('تم الطلب بتاريخ: ${DateFormat('yyyy-MM-dd HH:mm').format(timestamp)}'),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Text(
+                              'الحالة: ',
+                              style: TextStyle(fontWeight: FontWeight.w500),
+                            ),
+                            Text(
+                              _getStatusLabel(status),
+                              style: TextStyle(
+                                color: _getStatusColor(status),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        )
+                      ],
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }
