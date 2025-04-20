@@ -1,15 +1,18 @@
+// main_app_screen.dart
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:yalla_mazra3a/screens/my_bookings_screen.dart';
-import 'package:yalla_mazra3a/screens/profile_screen.dart';
-import 'package:yalla_mazra3a/screens/villa_listings_screen.dart';
-import 'package:yalla_mazra3a/screens/moderator_screen.dart';
-
+import '../providers/auth_provider.dart'; //correct import
+import '../providers/villa_provider.dart'; //correct import
+import 'my_bookings_screen.dart';
+import 'profile_screen.dart';
+import 'villa_listings_screen.dart';
+import 'moderator_screen.dart'; // Import the correct ModeratorScreen
 
 class MainAppScreen extends StatefulWidget {
   final bool isModerator;
+  final bool isAdmin;
 
-  const MainAppScreen({Key? key, this.isModerator = false}) : super(key: key);
+  const MainAppScreen({Key? key, this.isModerator = false, this.isAdmin=false}) : super(key: key);
 
   @override
   State<MainAppScreen> createState() => _MainAppScreenState();
@@ -30,7 +33,7 @@ class _MainAppScreenState extends State<MainAppScreen> with TickerProviderStateM
       const MyBookingsScreen(),
       const HomeContent(),
       const ProfileScreen(),
-      if (widget.isModerator) const ModeratorScreen(),
+      if (widget.isModerator || widget.isAdmin) const ModeratorScreen(),
     ];
 
     _tabs = [
@@ -38,7 +41,7 @@ class _MainAppScreenState extends State<MainAppScreen> with TickerProviderStateM
       const BottomNavigationBarItem(icon: Icon(Icons.work_outline), label: 'حجوزاتي'),
       const BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: 'الصفحة الرئيسية'),
       const BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'بروفايل'),
-      if (widget.isModerator)
+      if (widget.isModerator || widget.isAdmin)
         const BottomNavigationBarItem(icon: Icon(Icons.build_circle_outlined), label: 'شغلي'),
     ];
 
@@ -69,14 +72,14 @@ class _MainAppScreenState extends State<MainAppScreen> with TickerProviderStateM
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.article_outlined),
-          onPressed: () {},
+          onPressed: () { },
         ),
         title: const Text('يلا مزرعة', style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications_none),
-            onPressed: () {},
+            onPressed: () { },
           ),
         ],
         elevation: 0,
@@ -126,16 +129,6 @@ class ServicesScreen extends StatelessWidget {
   }
 }
 
-class ModeratorScreen extends StatelessWidget {
-  const ModeratorScreen({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Text('شغلي', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-    );
-  }
-}
 
 class HomeContent extends StatelessWidget {
   const HomeContent({Key? key}) : super(key: key);
@@ -169,21 +162,21 @@ class HomeContent extends StatelessWidget {
               label: 'رؤيتنا',
               angle: -pi / 4,
               radius: 120,
-              onTap: () {},
+              onTap: () { },
             ),
             PlanetButton(
               icon: Icons.video_library_outlined,
               label: 'فيديوهات',
               angle: pi / 4,
               radius: 120,
-              onTap: () {},
+              onTap: () { },
             ),
             PlanetButton(
               icon: Icons.lightbulb_outline,
               label: 'نصائح',
               angle: pi,
               radius: 120,
-              onTap: () {},
+              onTap: () { },
             ),
           ],
         ),

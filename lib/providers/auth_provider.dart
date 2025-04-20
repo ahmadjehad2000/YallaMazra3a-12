@@ -1,172 +1,176 @@
 import 'package:flutter/material.dart';
-import '../models/user.dart';
-import '../services/auth_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
-enum AuthStatus { initial, authenticated, unauthenticated }
+enum AuthStatus { initial, loading, authenticated, unauthenticated }
 
-class AuthProvider extends ChangeNotifier {
-  final AuthService _authService = AuthService();
-
+class AppAuthProvider with ChangeNotifier {
   AuthStatus _status = AuthStatus.initial;
-  User? _currentUser;
-  String _errorMessage = '';
+  User? _user;
+  bool _isModerator = false;
+  bool _isAdmin = false;
+  bool _isLocalMod = false;
 
-  AuthStatus get status => _status;
-  User? get currentUser => _currentUser;
-  String get errorMessage => _errorMessage;
-  bool get isAuthenticated => _status == AuthStatus.authenticated;
-  bool get isModerator => _currentUser?.isModerator ?? false;
-  bool get isAdmin => _currentUser?.isAdmin ?? false;
+  final _auth = FirebaseAuth.instance;
+  final _firestore = FirebaseFirestore.instance;
+  final _googleSignIn = GoogleSignIn();
 
-  AuthProvider() {
-    _initializeAuth();
+  AppAuthProvider() {
+    _auth.authStateChanges().listen(_onAuthStateChanged);
   }
 
-  Future<void> _initializeAuth() async {
-    if (_authService.currentUser != null) {
-      try {
-        final userData = await _authService.getUserData();
-        if (userData != null) {
-          _currentUser = userData;
-          _status = AuthStatus.authenticated;
-        } else {
-          _status = AuthStatus.unauthenticated;
-        }
-      } catch (e) {
-        _status = AuthStatus.unauthenticated;
-      }
+  AuthStatus get status => _status;
+  User? get user => _user;
+  bool get isModerator => _isModerator || _isLocalMod;
+  bool get isAdmin => _isAdmin;
+  bool get isAuthenticated => _user != null || _isLocalMod;
+
+  Future<void> _onAuthStateChanged(User? firebaseUser) async {
+    _user = firebaseUser;
+    if (_user != null) {
+      await _checkUserRole(_user!.uid);
+      _status = AuthStatus.authenticated;
     } else {
       _status = AuthStatus.unauthenticated;
+      _isModerator = false;
+      _isAdmin = false;
     }
     notifyListeners();
   }
 
-  Future<bool> registerWithPhonePassword({
-    required String name,
-    required String email,
-    required String phone,
-    required String password,
-  }) async {
+  Future<void> _checkUserRole(String uid) async {
     try {
-      _status = AuthStatus.initial;
-      _errorMessage = '';
+      final doc = await _firestore.collection('users').doc(uid).get();
+      final data = doc.data();
+      _isModerator = data?['isModerator'] ?? false;
+      _isAdmin = data?['isAdmin'] ?? false;
+    } catch (_) {
+      _isModerator = false;
+      _isAdmin = false;
+    }
+  }
+
+  Future<void> signInWithGoogle() async {
+    try {
+      _status = AuthStatus.loading;
       notifyListeners();
 
-      final user = await _authService.registerWithPhonePassword(
-        name: name,
-        email: email,
-        phone: phone,
-        password: password,
+      final googleUser = await _googleSignIn.signIn();
+      final googleAuth = await googleUser!.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
       );
 
-      if (user != null) {
-        _currentUser = user;
-        _status = AuthStatus.authenticated;
-        notifyListeners();
-        return true;
-      } else {
-        _errorMessage = 'فشل التسجيل، يرجى المحاولة مرة أخرى';
-        _status = AuthStatus.unauthenticated;
-        notifyListeners();
-        return false;
+      final userCredential = await _auth.signInWithCredential(credential);
+      _user = userCredential.user;
+      await _checkUserRole(_user!.uid);
+
+      final exists = await _firestore.collection('users').doc(_user!.uid).get();
+      if (!exists.exists) {
+        await _firestore.collection('users').doc(_user!.uid).set({
+          'email': _user!.email,
+          'isModerator': false,
+          'isAdmin': false,
+        });
       }
+
+      _status = AuthStatus.authenticated;
+      notifyListeners();
     } catch (e) {
-      _errorMessage = 'حدث خطأ أثناء التسجيل: ${e.toString()}';
       _status = AuthStatus.unauthenticated;
       notifyListeners();
       rethrow;
     }
   }
 
-  void setAuthenticated(bool value) {
-    _status = value ? AuthStatus.authenticated : AuthStatus.unauthenticated;
-    notifyListeners();
-  }
-
-  Future<bool> signInWithGoogle() async {
-    try {
-      _status = AuthStatus.initial;
-      _errorMessage = '';
-      notifyListeners();
-
-      final user = await _authService.signInWithGoogle();
-
-      if (user != null) {
-        _currentUser = user;
-        _status = AuthStatus.authenticated;
-        notifyListeners();
-        return true;
-      } else {
-        _errorMessage = 'فشل تسجيل الدخول باستخدام جوجل';
-        _status = AuthStatus.unauthenticated;
-        notifyListeners();
-        return false;
-      }
-    } catch (e) {
-      _errorMessage = 'فشل تسجيل الدخول باستخدام جوجل: ${e.toString()}';
-      _status = AuthStatus.unauthenticated;
-      notifyListeners();
-      return false;
+  Future<void> _createUserIfNotExists(User user) async {
+    final userDoc = _firestore.collection('users').doc(user.uid);
+    final docSnapshot = await userDoc.get();
+    if (!docSnapshot.exists) {
+      await userDoc.set({
+        'email': user.email ?? '',
+        'phoneNumber': user.phoneNumber ?? '',
+        'isModerator': false,
+        'isAdmin': false,
+      });
     }
   }
 
-  Future<bool> signInWithPhonePassword(String phone, String password) async {
+  Future<void> createUserWithEmailAndPassword(String email, String password) async {
     try {
-      _errorMessage = '';
-      _status = AuthStatus.initial;
+      _status = AuthStatus.loading;
       notifyListeners();
 
-      final user = await _authService.signInWithPhonePassword(phone, password);
+      final userCredential = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
 
-      if (user != null) {
-        _currentUser = user;
-        _status = AuthStatus.authenticated;
-        notifyListeners();
-        return true;
-      } else {
-        _errorMessage = 'رقم الهاتف أو كلمة المرور غير صحيحة';
-        _status = AuthStatus.unauthenticated;
-        notifyListeners();
-        return false;
-      }
+      _user = userCredential.user;
+      await _createUserIfNotExists(_user!);
+      await _checkUserRole(_user!.uid);
+      _status = AuthStatus.authenticated;
+      notifyListeners();
     } catch (e) {
-      _errorMessage = 'حدث خطأ أثناء تسجيل الدخول: ${e.toString()}';
       _status = AuthStatus.unauthenticated;
       notifyListeners();
-      return false;
+      rethrow;
+    }
+  }
+
+
+  Future<void> signInWithPhoneNumberAndPassword(String phone, String password) async {
+    try {
+      _status = AuthStatus.loading;
+      notifyListeners();
+
+      // Try FirebaseAuth first
+      final email = "$phone@example.com";
+      await _auth.signInWithEmailAndPassword(email: email, password: password);
+    } on FirebaseAuthException {
+      // Fallback to Firestore-only mod login
+      final query = await _firestore
+          .collection('user_auth')
+          .where('phone', isEqualTo: phone)
+          .limit(1)
+          .get();
+
+      if (query.docs.isNotEmpty) {
+        final doc = query.docs.first;
+        final data = doc.data();
+        if (data['password'] == password) {
+          final userQuery = await _firestore
+              .collection('users')
+              .where('phoneNumber', isEqualTo: phone)
+              .limit(1)
+              .get();
+          if (userQuery.docs.isNotEmpty) {
+            final userData = userQuery.docs.first.data();
+            _isLocalMod = userData['isModerator'] == true;
+            _isAdmin = userData['isAdmin'] == true;
+            _status = AuthStatus.authenticated;
+            notifyListeners();
+            return;
+          }
+        }
+      }
+
+      _status = AuthStatus.unauthenticated;
+      notifyListeners();
+      throw FirebaseAuthException(code: 'invalid-credentials', message: 'خطأ في رقم الهاتف أو كلمة المرور');
     }
   }
 
   Future<void> signOut() async {
-    try {
-      await _authService.signOut();
-      _currentUser = null;
-      _status = AuthStatus.unauthenticated;
-      notifyListeners();
-    } catch (e) {
-      print('Logout error: $e');
-    }
-  }
-
-  Future<void> toggleFavorite(String villaId) async {
-    if (_currentUser == null) return;
-
-    List<String> updatedFavorites = List.from(_currentUser!.favoriteVillas);
-
-    if (updatedFavorites.contains(villaId)) {
-      updatedFavorites.remove(villaId);
-    } else {
-      updatedFavorites.add(villaId);
-    }
-
-    final updatedUser = _currentUser!.copyWith(favoriteVillas: updatedFavorites);
-    _currentUser = updatedUser;
-
-    await _authService.updateUserData(updatedUser);
+    _isLocalMod = false;
+    _isAdmin = false;
+    _isModerator = false;
+    _user = null;
+    await _auth.signOut();
+    await _googleSignIn.signOut();
+    _status = AuthStatus.unauthenticated;
     notifyListeners();
-  }
-
-  bool isFavorite(String villaId) {
-    return _currentUser?.favoriteVillas.contains(villaId) ?? false;
   }
 }
