@@ -165,8 +165,8 @@ class HomeContent extends StatelessWidget {
               onTap: () { },
             ),
             PlanetButton(
-              icon: Icons.video_library_outlined,
-              label: 'فيديوهات',
+              icon: Icons.monetization_on_outlined,
+              label: 'فور سيل',
               angle: pi / 4,
               radius: 120,
               onTap: () { },

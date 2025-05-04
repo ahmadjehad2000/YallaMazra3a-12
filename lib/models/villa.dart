@@ -4,7 +4,8 @@ class Villa {
   final String id;
   final String name;
   final String location;
-  final String imageUrl;
+  final String imageUrl;           // fallback single image
+  final List<String> images;       // ← new multi-image field
   final String description;
   final double price;
   final double rating;
@@ -18,6 +19,7 @@ class Villa {
     required this.name,
     required this.location,
     required this.imageUrl,
+    this.images = const [],        // initialize to empty list
     required this.description,
     required this.price,
     required this.rating,
@@ -33,6 +35,7 @@ class Villa {
       name: map['name'] as String? ?? '',
       location: map['location'] as String? ?? '',
       imageUrl: map['image_url'] as String? ?? '',
+      images: List<String>.from(map['images'] ?? []),  // ← read array
       description: map['description'] as String? ?? '',
       price: (map['price'] is int)
           ? (map['price'] as int).toDouble()
@@ -53,6 +56,7 @@ class Villa {
       'name': name,
       'location': location,
       'image_url': imageUrl,
+      'images': images,           // ← persist array
       'description': description,
       'price': price,
       'rating': rating,

@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/villa_provider.dart';
 import '../models/villa.dart';
 import 'villa_detail_screen.dart';
@@ -15,13 +16,11 @@ class VillaListingsScreen extends StatefulWidget {
 class _VillaListingsScreenState extends State<VillaListingsScreen> {
   final TextEditingController _searchController = TextEditingController();
   String? _selectedLocation;
-  int? _selectedPriceIndex;
+  int _selectedPriceIndex = 0;
 
   final List<String> _locations = [
     'عمان', 'إربد', 'العقبة', 'الزرقاء', 'مأدبا', 'الكرك', 'المفرق'
   ];
-
-  // Fixed price ranges like Amazon filter
   final List<Map<String, dynamic>> _priceOptions = [
     {'label': 'كل الأسعار', 'min': 0.0, 'max': null},
     {'label': 'أقل من 50 JD', 'min': 0.0, 'max': 50.0},
@@ -42,7 +41,6 @@ class _VillaListingsScreenState extends State<VillaListingsScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedPriceIndex = 0; // default to all prices
   }
 
   @override
@@ -67,9 +65,8 @@ class _VillaListingsScreenState extends State<VillaListingsScreen> {
             return const Center(child: Text('لا توجد فيلات'));
           }
 
-          // Filter logic
           final query = _searchController.text.trim().toLowerCase();
-          final priceOpt = _priceOptions[_selectedPriceIndex!];
+          final priceOpt = _priceOptions[_selectedPriceIndex];
 
           final filtered = allVillas.where((v) {
             final matchesQuery = query.isEmpty ||
@@ -87,7 +84,7 @@ class _VillaListingsScreenState extends State<VillaListingsScreen> {
 
           return Column(
             children: [
-              // Filters Section
+              // Filters section (search, location, price)
               Container(
                 color: Colors.white,
                 padding: const EdgeInsets.all(12),
@@ -167,6 +164,12 @@ class _VillaListingsScreenState extends State<VillaListingsScreen> {
                   separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (ctx, i) {
                     final v = filtered[i];
+                    // First image from v.images if you updated the model, else fallback to imageUrl
+                    String displayUrl = v.imageUrl;
+                    if (v.images != null && v.images.isNotEmpty) {
+                      displayUrl = v.images.first;
+                    }
+
                     return Card(
                       elevation: 4,
                       shape: RoundedRectangleBorder(
@@ -187,40 +190,30 @@ class _VillaListingsScreenState extends State<VillaListingsScreen> {
                             children: [
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(8),
-                                child: v.imageUrl.isNotEmpty
-                                    ? Image.network(
-                                  v.imageUrl,
+                                child: displayUrl.isNotEmpty
+                                    ? CachedNetworkImage(
+                                  imageUrl: displayUrl,
                                   width: 100,
                                   height: 100,
                                   fit: BoxFit.cover,
-                                  loadingBuilder: (context, child, progress) {
-                                    if (progress == null) return child;
-                                    return Container(
-                                      width: 100,
-                                      height: 100,
-                                      color: Colors.grey.shade200,
-                                      child: Center(
-                                        child: CircularProgressIndicator(
-                                          value: progress.expectedTotalBytes != null
-                                              ? progress.cumulativeBytesLoaded /
-                                              progress.expectedTotalBytes!
-                                              : null,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  errorBuilder: (context, error, stack) {
-                                    return Container(
-                                      width: 100,
-                                      height: 100,
-                                      color: Colors.grey.shade300,
-                                      child: const Icon(
-                                        Icons.broken_image,
-                                        size: 40,
-                                        color: Colors.grey,
-                                      ),
-                                    );
-                                  },
+                                  placeholder: (_, __) => Container(
+                                    width: 100,
+                                    height: 100,
+                                    color: Colors.grey.shade200,
+                                    child: const Center(
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  ),
+                                  errorWidget: (_, __, ___) => Container(
+                                    width: 100,
+                                    height: 100,
+                                    color: Colors.grey.shade300,
+                                    child: const Icon(
+                                      Icons.broken_image,
+                                      size: 40,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
                                 )
                                     : Container(
                                   width: 100,
